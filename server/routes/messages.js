@@ -1,0 +1,25 @@
+
+const express = require('express');
+const router = express.Router();
+const messageController = require('../controllers/messageController');
+const { authenticateToken, authorizeRoles } = require('../middleware/auth');
+const upload = require('../middleware/multer');
+
+router.post('/', authenticateToken, upload.single('file'), messageController.sendMessage);
+router.get('/inbox', authenticateToken, messageController.getInbox);
+router.get('/sent', authenticateToken, messageController.getSent);
+router.get('/drafts', authenticateToken, messageController.getDrafts);
+router.get('/admin/all', authenticateToken, authorizeRoles('admin'), messageController.getAllMessagesAdmin);
+router.get('/track', authenticateToken, messageController.trackMessage);
+
+router.get('/:id', authenticateToken, messageController.getMessageById);
+router.get('/:id/history', authenticateToken, messageController.getMessageHistory);
+
+router.patch('/:id/read', authenticateToken, messageController.markAsRead);
+router.post('/:id/submit', authenticateToken, messageController.submitDraft);
+router.post('/:id/forward', authenticateToken, messageController.forwardMessage);
+router.get('/:id/attachment', authenticateToken, messageController.downloadAttachment);
+
+// TODO: Add forwarding, search, filter, download endpoints
+
+module.exports = router;
