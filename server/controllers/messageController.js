@@ -313,14 +313,6 @@ exports.forwardMessage = async (req, res) => {
         due_date: due_date || null
       }, message.department_id);
       await messageEventModel.create({
-        message_id: id,
-        event_type: 'forwarded',
-        actor_id: req.user.id,
-        note: note || null,
-        from_status: message.status,
-        to_status: message.status
-      });
-      await messageEventModel.create({
         message_id: newId,
         event_type: 'forwarded',
         actor_id: req.user.id,

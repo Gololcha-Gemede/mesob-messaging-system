@@ -168,10 +168,10 @@ module.exports = {
         WHERE a.parent_message_id IS NULL OR parent.id IS NULL
       ),
       message_chain AS (
-        SELECT root_messages.*, 0 AS chain_depth, CAST(LPAD(root_messages.id, 10, '0') AS CHAR(1000)) AS chain_path
+        SELECT root_messages.*, root_messages.id AS root_id, 0 AS chain_depth, CAST(LPAD(root_messages.id, 10, '0') AS CHAR(1000)) AS chain_path
         FROM root_messages
         UNION ALL
-        SELECT child.*, parent.chain_depth + 1, CONCAT(parent.chain_path, '/', LPAD(child.id, 10, '0'))
+        SELECT child.*, parent.root_id, parent.chain_depth + 1, CONCAT(parent.chain_path, '/', LPAD(child.id, 10, '0'))
         FROM messages child
         JOIN message_chain parent ON child.parent_message_id = parent.id
       )
@@ -182,7 +182,36 @@ module.exports = {
              parent.sender_id AS parent_sender_id,
              parent.receiver_id AS parent_receiver_id,
              ps.name AS parent_sender_name,
-             pr.name AS parent_receiver_name
+             pr.name AS parent_receiver_name,
+             (
+               SELECT fe.created_at
+               FROM message_events fe
+               WHERE fe.message_id = mc.id AND fe.event_type = 'forwarded'
+               ORDER BY fe.id ASC
+               LIMIT 1
+             ) AS forwarded_at,
+             (
+               SELECT fe.actor_id
+               FROM message_events fe
+               WHERE fe.message_id = mc.id AND fe.event_type = 'forwarded'
+               ORDER BY fe.id ASC
+               LIMIT 1
+             ) AS forwarded_by_id,
+             (
+               SELECT fu.name
+               FROM message_events fe
+               LEFT JOIN users fu ON fu.id = fe.actor_id
+               WHERE fe.message_id = mc.id AND fe.event_type = 'forwarded'
+               ORDER BY fe.id ASC
+               LIMIT 1
+             ) AS forwarded_by_name,
+             (
+               SELECT fe.note
+               FROM message_events fe
+               WHERE fe.message_id = mc.id AND fe.event_type = 'forwarded'
+               ORDER BY fe.id ASC
+               LIMIT 1
+             ) AS forward_note
       FROM message_chain mc
       LEFT JOIN users s ON s.id = mc.sender_id
       LEFT JOIN users r ON r.id = mc.receiver_id
@@ -196,7 +225,8 @@ module.exports = {
         WHERE EXISTS (
           SELECT 1
           FROM message_chain access_chain
-          WHERE access_chain.sender_id = ? OR access_chain.receiver_id = ?
+          WHERE access_chain.root_id = mc.root_id
+            AND (access_chain.sender_id = ? OR access_chain.receiver_id = ?)
         )`;
       params.push(userId, userId);
     }

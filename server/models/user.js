@@ -6,10 +6,10 @@ module.exports = {
     return rows[0];
   },
   async create(user) {
-    const { name, email, password, role, department_id } = user;
+    const { name, email, password, role, department_id, profile_image_path = null } = user;
     const [result] = await pool.query(
-      'INSERT INTO users (name, email, password, role, department_id) VALUES (?, ?, ?, ?, ?)',
-      [name, email, password, role, department_id]
+      'INSERT INTO users (name, email, password, role, department_id, profile_image_path) VALUES (?, ?, ?, ?, ?, ?)',
+      [name, email, password, role, department_id, profile_image_path]
     );
     return result.insertId;
   },
@@ -17,18 +17,19 @@ module.exports = {
     const [rows] = await pool.query('SELECT * FROM users');
     return rows;
   },
-  async update(id, { name, email, role, department_id, password }) {
+  async update(id, { name, email, role, department_id, password, profile_image_path }) {
+    const fields = ['name = ?', 'email = ?', 'role = ?', 'department_id = ?'];
+    const params = [name, email, role, department_id];
     if (password) {
-      await pool.query(
-        'UPDATE users SET name = ?, email = ?, role = ?, department_id = ?, password = ? WHERE id = ?',
-        [name, email, role, department_id, password, id]
-      );
-    } else {
-      await pool.query(
-        'UPDATE users SET name = ?, email = ?, role = ?, department_id = ? WHERE id = ?',
-        [name, email, role, department_id, id]
-      );
+      fields.push('password = ?');
+      params.push(password);
     }
+    if (profile_image_path !== undefined) {
+      fields.push('profile_image_path = ?');
+      params.push(profile_image_path);
+    }
+    params.push(id);
+    await pool.query(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`, params);
   },
   async deleteById(id) {
     const [result] = await pool.query('DELETE FROM users WHERE id = ?', [id]);
@@ -46,7 +47,7 @@ module.exports = {
     return c;
   },
   async getRecipients({ query, excludeUserId }) {
-    let sql = 'SELECT id, name, email, role, department_id FROM users WHERE id != ?';
+    let sql = 'SELECT id, name, email, role, department_id, profile_image_path FROM users WHERE id != ?';
     const params = [excludeUserId];
 
     if (query) {

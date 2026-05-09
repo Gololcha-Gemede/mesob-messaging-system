@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('staff');
   const [departmentId, setDepartmentId] = useState('');
+  const [profileImage, setProfileImage] = useState(null);
   const [departments, setDepartments] = useState([]);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -39,10 +40,17 @@ export default function RegisterPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/users', { name, email, password, role, department_id: departmentId }, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      const body = new FormData();
+      body.append('name', name);
+      body.append('email', email);
+      body.append('password', password);
+      body.append('role', role);
+      body.append('department_id', departmentId);
+      if (profileImage) body.append('profile_image', profileImage);
+      await axios.post('/api/users', body, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
       sessionStorage.removeItem(ADMIN_REGISTER_SESSION_KEY);
       setSuccess('User registered successfully!');
-      setName(''); setEmail(''); setPassword(''); setRole('staff'); setDepartmentId('');
+      setName(''); setEmail(''); setPassword(''); setRole('staff'); setDepartmentId(''); setProfileImage(null);
       setError('');
     } catch {
       setError('Registration failed.');
@@ -115,6 +123,14 @@ export default function RegisterPage() {
             ))}
           </select>
         </AuthInputRow>
+        <label className="auth-file-field">
+          <span>Profile picture</span>
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => setProfileImage(e.target.files?.[0] || null)}
+          />
+        </label>
         <button type="submit" className="auth-submit">
           Register
         </button>

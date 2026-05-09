@@ -91,27 +91,38 @@ export default function TrackMessagePage() {
         <div className="detail-section">
           <h3>{messages.length ? `Results (${messages.length})` : 'No matching messages'}</h3>
           <ul className="message-list">
-            {messages.map((msg) => (
-              <li key={msg.id} className="message-item">
-                <Link to={`/messages/${msg.id}`}>
-                  <div className="message-item-title">{msg.subject || '(No subject)'}</div>
-                  <div className="message-item-meta">
-                    <span className="track-chain-step">{Number(msg.chain_depth || 0) + 1}</span>
-                    <span>{msg.reference_number}</span>
-                    <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
-                    <span>From {displayUser(msg.sender_name, msg.sender_id)}</span>
-                    <span>To {displayUser(msg.receiver_name, msg.receiver_id)}</span>
-                    {formatDate(msg.submitted_at || msg.created_at) ? <span>{formatDate(msg.submitted_at || msg.created_at)}</span> : null}
-                    {msg.parent_message_id ? (
-                      <span className="forward-chain-note">
-                        Forwarded by {displayUser(msg.sender_name, msg.sender_id)} from {displayUser(msg.parent_receiver_name, msg.parent_receiver_id)} ({msg.parent_reference_number})
-                      </span>
-                    ) : null}
-                    {msg.read_at ? <span>Read {formatDate(msg.read_at)}</span> : <span>Unread</span>}
-                  </div>
-                </Link>
-              </li>
-            ))}
+            {messages.map((msg) => {
+              const isForwarded = Boolean(msg.parent_message_id);
+              const sentAt = formatDate(msg.submitted_at || msg.created_at);
+              const forwardedAt = formatDate(msg.forwarded_at || msg.submitted_at || msg.created_at);
+              const forwardedBy = displayUser(msg.forwarded_by_name || msg.sender_name, msg.forwarded_by_id || msg.sender_id);
+              const receiver = displayUser(msg.receiver_name, msg.receiver_id);
+              return (
+                <li key={msg.id} className="message-item">
+                  <Link to={`/messages/${msg.id}`}>
+                    <div className="message-item-title">{msg.subject || '(No subject)'}</div>
+                    <div className="message-item-meta">
+                      <span className="track-chain-step">{Number(msg.chain_depth || 0) + 1}</span>
+                      <span>{msg.reference_number}</span>
+                      <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
+                      <span>From {displayUser(msg.sender_name, msg.sender_id)}</span>
+                      <span>To {receiver}</span>
+                      {!isForwarded && sentAt ? <span>Sent {sentAt}</span> : null}
+                      {isForwarded ? (
+                        <span className="forward-chain-note">
+                          Forwarded to {receiver} by {forwardedBy}{forwardedAt ? ` at ${forwardedAt}` : ''}
+                        </span>
+                      ) : null}
+                      {isForwarded && msg.parent_reference_number ? (
+                        <span>Original step {msg.parent_reference_number}</span>
+                      ) : null}
+                      {msg.forward_note ? <span>Note: {msg.forward_note}</span> : null}
+                      {msg.read_at ? <span>Read {formatDate(msg.read_at)}</span> : <span>Unread</span>}
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
           {!isAdmin ? <p className="admin-panel-hint">Staff tracking shows chains where you are a sender or receiver, including forwarded recipients.</p> : null}
         </div>

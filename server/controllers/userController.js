@@ -1,11 +1,22 @@
 const bcrypt = require('bcryptjs');
 const userModel = require('../models/user');
 
+function uploadedProfilePath(file) {
+  return file?.filename ? `/uploads/${file.filename}` : null;
+}
+
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role, department_id } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
-    const userId = await userModel.create({ name, email, password: hashedPassword, role, department_id });
+    const userId = await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      role,
+      department_id,
+      profile_image_path: uploadedProfilePath(req.file)
+    });
     res.status(201).json({ id: userId });
   } catch (err) {
     res.status(500).json({ message: 'Error creating user', error: err.message });

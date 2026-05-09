@@ -12,6 +12,7 @@ export default function AdminPanelPage() {
   const [editingDeptId, setEditingDeptId] = useState(null);
   const [editingDeptName, setEditingDeptName] = useState('');
   const [editingUser, setEditingUser] = useState(null);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(null);
   const activeSection = searchParams.get('section') === 'departments' ? 'departments' : 'users';
   const [userSearch, setUserSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
@@ -61,8 +62,9 @@ export default function AdminPanelPage() {
   const handleDeptSubmit = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('/api/departments', { name: deptName }, authHeaders());
+      const res = await axios.post('/api/departments', { name: deptName }, authHeaders());
       setDeptName('');
+      setSelectedDepartmentId(res.data?.id ?? null);
       await loadData();
     } catch {
       setListError('Could not create department.');
@@ -92,6 +94,7 @@ export default function AdminPanelPage() {
   const deleteDept = async (id) => {
     try {
       await axios.delete(`/api/departments/${id}`, authHeaders());
+      if (selectedDepartmentId === id) setSelectedDepartmentId(null);
       setConfirmAction(null);
       await loadData();
     } catch (err) {
@@ -161,6 +164,13 @@ export default function AdminPanelPage() {
   const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
   const adminCount = users.filter((user) => user.role === 'admin').length;
   const staffCount = users.filter((user) => user.role !== 'admin').length;
+  const effectiveSelectedDepartmentId = departments.some((department) => department.id === selectedDepartmentId)
+    ? selectedDepartmentId
+    : departments[0]?.id ?? null;
+  const selectedDepartment = departments.find((department) => department.id === effectiveSelectedDepartmentId) || null;
+  const selectedDepartmentUsers = selectedDepartment
+    ? users.filter((user) => user.department_id === selectedDepartment.id)
+    : [];
 
   return (
     <div className="admin-panel-container">
@@ -177,23 +187,6 @@ export default function AdminPanelPage() {
         <div className="admin-stat-card"><span>Admins</span><strong>{adminCount}</strong></div>
         <div className="admin-stat-card"><span>Staff</span><strong>{staffCount}</strong></div>
         <div className="admin-stat-card"><span>Departments</span><strong>{departments.length}</strong></div>
-      </div>
-
-      <div className="admin-section-switch">
-        <button
-          type="button"
-          className={activeSection === 'users' ? 'admin-switch-btn admin-switch-btn--active' : 'admin-switch-btn'}
-          onClick={() => changeSection('users')}
-        >
-          Users
-        </button>
-        <button
-          type="button"
-          className={activeSection === 'departments' ? 'admin-switch-btn admin-switch-btn--active' : 'admin-switch-btn'}
-          onClick={() => changeSection('departments')}
-        >
-          Departments
-        </button>
       </div>
 
       {activeSection === 'users' ? (
@@ -336,34 +329,63 @@ export default function AdminPanelPage() {
             <button type="submit">Create Department</button>
           </form>
 
-          <div className="department-grid">
-            {departments.map((d) => {
-              const deptUsers = users.filter((u) => u.department_id === d.id);
-              return (
-                <section className="department-card" key={d.id}>
+          <div className="department-management-layout">
+            <div className="department-list-panel">
+              <h4>Department List</h4>
+              <div className="department-list">
+                {departments.map((d) => {
+                  const deptUsers = users.filter((u) => u.department_id === d.id);
+                  const isSelected = effectiveSelectedDepartmentId === d.id;
+                  return (
+                    <button
+                      type="button"
+                      className={isSelected ? 'department-list-item department-list-item--active' : 'department-list-item'}
+                      key={d.id}
+                      onClick={() => {
+                        setSelectedDepartmentId(d.id);
+                        if (editingDeptId !== d.id) cancelEditDept();
+                      }}
+                    >
+                      <span>{d.name}</span>
+                      <strong>{deptUsers.length}</strong>
+                    </button>
+                  );
+                })}
+                {!departments.length ? <div className="empty-state">No departments created yet.</div> : null}
+              </div>
+            </div>
+
+            <section className="department-detail-panel">
+              {selectedDepartment ? (
+                <>
                   <div className="department-card-header">
-                    {editingDeptId === d.id ? (
-                      <input className="admin-inline-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} />
-                    ) : (
-                      <h4>{d.name}</h4>
-                    )}
-                    <span className="badge">{deptUsers.length}</span>
+                    <div>
+                      {editingDeptId === selectedDepartment.id ? (
+                        <input className="admin-inline-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} />
+                      ) : (
+                        <h4>{selectedDepartment.name}</h4>
+                      )}
+                      <p className="admin-panel-hint">{selectedDepartmentUsers.length} user(s) assigned to this department.</p>
+                    </div>
+                    <span className="badge">{selectedDepartmentUsers.length}</span>
                   </div>
+
                   <div className="admin-edit-user-actions">
-                    {editingDeptId === d.id ? (
+                    {editingDeptId === selectedDepartment.id ? (
                       <>
-                        <button type="button" className="admin-row-btn" onClick={() => saveDept(d.id)}>Save</button>
+                        <button type="button" className="admin-row-btn" onClick={() => saveDept(selectedDepartment.id)}>Save</button>
                         <button type="button" className="admin-row-btn secondary-btn" onClick={cancelEditDept}>Cancel</button>
                       </>
                     ) : (
                       <>
-                        <button type="button" className="admin-row-btn" onClick={() => startEditDept(d)}>Edit Department</button>
-                        <button type="button" className="admin-row-btn danger-btn danger-btn--soft" onClick={() => setConfirmAction({ type: 'department', id: d.id, label: d.name })}>Delete Department</button>
+                        <button type="button" className="admin-row-btn" onClick={() => startEditDept(selectedDepartment)}>Edit Department</button>
+                        <button type="button" className="admin-row-btn danger-btn danger-btn--soft" onClick={() => setConfirmAction({ type: 'department', id: selectedDepartment.id, label: selectedDepartment.name })}>Delete Department</button>
                       </>
                     )}
                   </div>
+
                   <ul className="department-user-list">
-                    {deptUsers.length ? deptUsers.map((u) => (
+                    {selectedDepartmentUsers.length ? selectedDepartmentUsers.map((u) => (
                       <li key={u.id}>
                         <div>
                           <strong>{u.name}</strong>
@@ -379,9 +401,11 @@ export default function AdminPanelPage() {
                       </li>
                     )) : <li className="department-empty">No users assigned.</li>}
                   </ul>
-                </section>
-              );
-            })}
+                </>
+              ) : (
+                <div className="empty-state">Select a department to view details.</div>
+              )}
+            </section>
           </div>
         </div>
       ) : null}
