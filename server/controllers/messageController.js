@@ -12,10 +12,19 @@ function padNumber(num, size) {
 async function generateReferenceNumber(department_id) {
   const departments = await departmentModel.getAll();
   const year = new Date().getFullYear();
-  const [[{ count }]] = await pool.query('SELECT COUNT(*) as count FROM messages WHERE department_id = ?', [department_id]);
   const deptId = Number(department_id);
   const deptName = departments.find((d) => d.id === deptId)?.name?.substring(0, 3).toUpperCase() || 'GEN';
-  return `${deptName}-${year}-${padNumber(count+1, 4)}`;
+  const prefix = `${deptName}-${year}-`;
+  const [rows] = await pool.query(
+    `SELECT reference_number
+     FROM messages
+     WHERE department_id = ? AND reference_number LIKE ?
+     ORDER BY reference_number DESC
+     LIMIT 1`,
+    [department_id, `${prefix}%`]
+  );
+  const lastNumber = Number(String(rows[0]?.reference_number || '').split('-').pop());
+  return `${prefix}${padNumber((Number.isInteger(lastNumber) ? lastNumber : 0) + 1, 4)}`;
 }
 
 async function getUserDepartmentId(userId) {
@@ -49,6 +58,32 @@ function canAccessMessage(user, message) {
   return Number(message.sender_id) === Number(user.id) || Number(message.receiver_id) === Number(user.id);
 }
 
+async function createMessageWithReference(payload, departmentId, maxAttempts = 5) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const reference_number = await generateReferenceNumber(departmentId);
+    try {
+      const messageId = await messageModel.create({ ...payload, reference_number });
+      return { messageId, reference_number };
+    } catch (err) {
+      if (err.code !== 'ER_DUP_ENTRY' || attempt === maxAttempts - 1) throw err;
+    }
+  }
+  throw new Error('Unable to generate a unique reference number');
+}
+
+async function forwardMessageWithReference(payload, departmentId, maxAttempts = 5) {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const reference_number = await generateReferenceNumber(departmentId);
+    try {
+      const messageId = await messageModel.forward({ ...payload, reference_number });
+      return { messageId, reference_number };
+    } catch (err) {
+      if (err.code !== 'ER_DUP_ENTRY' || attempt === maxAttempts - 1) throw err;
+    }
+  }
+  throw new Error('Unable to generate a unique reference number');
+}
+
 exports.sendMessage = async (req, res) => {
   try {
     const { receiver_id, receiver_ids, subject, content, department_id, action, due_date } = req.body;
@@ -75,18 +110,16 @@ exports.sendMessage = async (req, res) => {
     const createdMessages = [];
 
     for (const receiverId of receiversToCreate) {
-      const reference_number = await generateReferenceNumber(effectiveDepartmentId);
-      const messageId = await messageModel.create({
+      const { messageId, reference_number } = await createMessageWithReference({
         sender_id,
         receiver_id: receiverId,
         subject: normalizedAction === 'submit' ? subjectTrimmed : (subject || ''),
         content: content || '',
-        reference_number,
         status,
         file_path,
         department_id: effectiveDepartmentId,
         due_date: due_date || null
-      });
+      }, effectiveDepartmentId);
       await messageEventModel.create({
         message_id: messageId,
         event_type: normalizedAction === 'draft' ? 'created_draft' : 'submitted',
@@ -139,6 +172,29 @@ exports.getDrafts = async (req, res) => {
   }
 };
 
+exports.deleteDrafts = async (req, res) => {
+  try {
+    const ids = Array.isArray(req.body?.ids) ? req.body.ids : [req.params.id];
+    const deleted = await messageModel.deleteDrafts(req.user.id, ids);
+    if (!deleted) return res.status(404).json({ message: 'No matching draft messages found' });
+    res.json({ message: 'Draft message deleted', deleted });
+  } catch (err) {
+    res.status(500).json({ message: 'Error deleting draft messages', error: err.message });
+  }
+};
+
+exports.getUnreadNotifications = async (req, res) => {
+  try {
+    const [messages, count] = await Promise.all([
+      messageModel.getUnreadForUser(req.user.id),
+      messageModel.countUnreadForUser(req.user.id)
+    ]);
+    res.json({ count, messages });
+  } catch (err) {
+    res.status(500).json({ message: 'Error fetching notifications', error: err.message });
+  }
+};
+
 exports.getAllMessagesAdmin = async (req, res) => {
   try {
     const rows = await messageModel.getAllForAdmin(req.user.id);
@@ -171,6 +227,9 @@ exports.trackMessage = async (req, res) => {
 exports.markAsRead = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
+      return res.status(400).json({ message: 'Invalid message id' });
+    }
     const changed = await messageModel.markAsRead(id, req.user.id);
     if (changed) {
       await messageEventModel.create({
@@ -204,7 +263,7 @@ exports.getMessageHistory = async (req, res) => {
     const message = await messageModel.getById(id);
     if (!message) return res.status(404).json({ message: 'Message not found' });
     if (!canAccessMessage(req.user, message)) return res.status(403).json({ message: 'Forbidden' });
-    const history = await messageEventModel.getByMessageId(id);
+    const history = await messageEventModel.getByMessageChainId(id);
     res.json(history);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching message history', error: err.message });
@@ -247,13 +306,19 @@ exports.forwardMessage = async (req, res) => {
     const forwardedMessages = [];
 
     for (const receiverId of selectedReceiverIds) {
-      const reference_number = await generateReferenceNumber(message.department_id);
-      const newId = await messageModel.forward({
+      const { messageId: newId, reference_number } = await forwardMessageWithReference({
         original_id: id,
         new_receiver_id: receiverId,
         actor_id: req.user.id,
-        reference_number,
         due_date: due_date || null
+      }, message.department_id);
+      await messageEventModel.create({
+        message_id: id,
+        event_type: 'forwarded',
+        actor_id: req.user.id,
+        note: note || null,
+        from_status: message.status,
+        to_status: message.status
       });
       await messageEventModel.create({
         message_id: newId,

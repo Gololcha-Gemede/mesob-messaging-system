@@ -19,5 +19,41 @@ module.exports = {
       [messageId]
     );
     return rows;
+  },
+
+  async getByMessageChainId(messageId) {
+    const [rows] = await pool.query(
+      `WITH RECURSIVE
+       ancestors AS (
+         SELECT *
+         FROM messages
+         WHERE id = ?
+         UNION ALL
+         SELECT parent.*
+         FROM messages parent
+         JOIN ancestors child ON child.parent_message_id = parent.id
+       ),
+       roots AS (
+         SELECT a.*
+         FROM ancestors a
+         LEFT JOIN messages parent ON parent.id = a.parent_message_id
+         WHERE a.parent_message_id IS NULL OR parent.id IS NULL
+       ),
+       chain AS (
+         SELECT r.*, 0 AS chain_depth, CAST(LPAD(r.id, 10, '0') AS CHAR(1000)) AS chain_path
+         FROM roots r
+         UNION ALL
+         SELECT child.*, chain.chain_depth + 1, CONCAT(chain.chain_path, '/', LPAD(child.id, 10, '0'))
+         FROM messages child
+         JOIN chain ON child.parent_message_id = chain.id
+       )
+       SELECT me.*, u.name AS actor_name, c.reference_number, c.subject, c.chain_depth, c.chain_path
+       FROM chain c
+       JOIN message_events me ON me.message_id = c.id
+       LEFT JOIN users u ON u.id = me.actor_id
+       ORDER BY c.chain_path ASC, me.id ASC`,
+      [messageId]
+    );
+    return rows;
   }
 };

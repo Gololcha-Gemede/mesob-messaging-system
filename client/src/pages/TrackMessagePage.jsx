@@ -14,6 +14,10 @@ function formatDate(value) {
   }
 }
 
+function displayUser(name, id) {
+  return name || (id ? `User #${id}` : 'Unassigned');
+}
+
 export default function TrackMessagePage() {
   const [reference, setReference] = useState('');
   const [subject, setSubject] = useState('');
@@ -92,17 +96,24 @@ export default function TrackMessagePage() {
                 <Link to={`/messages/${msg.id}`}>
                   <div className="message-item-title">{msg.subject || '(No subject)'}</div>
                   <div className="message-item-meta">
+                    <span className="track-chain-step">{Number(msg.chain_depth || 0) + 1}</span>
                     <span>{msg.reference_number}</span>
                     <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
-                    <span>From {msg.sender_name || `User #${msg.sender_id}`}</span>
-                    <span>To {msg.receiver_name || `User #${msg.receiver_id}`}</span>
+                    <span>From {displayUser(msg.sender_name, msg.sender_id)}</span>
+                    <span>To {displayUser(msg.receiver_name, msg.receiver_id)}</span>
                     {formatDate(msg.submitted_at || msg.created_at) ? <span>{formatDate(msg.submitted_at || msg.created_at)}</span> : null}
+                    {msg.parent_message_id ? (
+                      <span className="forward-chain-note">
+                        Forwarded by {displayUser(msg.sender_name, msg.sender_id)} from {displayUser(msg.parent_receiver_name, msg.parent_receiver_id)} ({msg.parent_reference_number})
+                      </span>
+                    ) : null}
+                    {msg.read_at ? <span>Read {formatDate(msg.read_at)}</span> : <span>Unread</span>}
                   </div>
                 </Link>
               </li>
             ))}
           </ul>
-          {!isAdmin ? <p className="admin-panel-hint">Staff tracking only shows messages you sent.</p> : null}
+          {!isAdmin ? <p className="admin-panel-hint">Staff tracking shows chains where you are a sender or receiver, including forwarded recipients.</p> : null}
         </div>
       ) : null}
     </div>

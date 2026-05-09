@@ -9,12 +9,15 @@ router.post('/', authenticateToken, upload.single('file'), messageController.sen
 router.get('/inbox', authenticateToken, messageController.getInbox);
 router.get('/sent', authenticateToken, messageController.getSent);
 router.get('/drafts', authenticateToken, messageController.getDrafts);
+router.delete('/drafts', authenticateToken, messageController.deleteDrafts);
+router.get('/notifications', authenticateToken, messageController.getUnreadNotifications);
 router.get('/admin/all', authenticateToken, authorizeRoles('admin'), messageController.getAllMessagesAdmin);
 router.get('/track', authenticateToken, messageController.trackMessage);
 
 router.get('/:id', authenticateToken, messageController.getMessageById);
 router.get('/:id/history', authenticateToken, messageController.getMessageHistory);
 
+router.delete('/:id/draft', authenticateToken, messageController.deleteDrafts);
 router.patch('/:id/read', authenticateToken, messageController.markAsRead);
 router.post('/:id/submit', authenticateToken, messageController.submitDraft);
 router.post('/:id/forward', authenticateToken, messageController.forwardMessage);

@@ -1,16 +1,23 @@
-import { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
 
 export default function AdminPanelPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [deptName, setDeptName] = useState('');
   const [editingDeptId, setEditingDeptId] = useState(null);
   const [editingDeptName, setEditingDeptName] = useState('');
   const [editingUser, setEditingUser] = useState(null);
+  const activeSection = searchParams.get('section') === 'departments' ? 'departments' : 'users';
+  const [userSearch, setUserSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [page, setPage] = useState(1);
+  const [confirmAction, setConfirmAction] = useState(null);
   const [editForm, setEditForm] = useState({
     name: '',
     email: '',
@@ -24,30 +31,32 @@ export default function AdminPanelPage() {
 
   const loadData = useCallback(async () => {
     setListError('');
-    const h = { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } };
+    const h = authHeaders();
     const [usersRes, deptRes] = await Promise.allSettled([
       axios.get('/api/users', h),
       axios.get('/api/departments', h),
     ]);
 
-    if (usersRes.status === 'fulfilled') setUsers(usersRes.value.data);
-    if (deptRes.status === 'fulfilled') setDepartments(deptRes.value.data);
+    if (usersRes.status === 'fulfilled') setUsers(Array.isArray(usersRes.value.data) ? usersRes.value.data : []);
+    if (deptRes.status === 'fulfilled') setDepartments(Array.isArray(deptRes.value.data) ? deptRes.value.data : []);
 
     const errors = [];
-    if (usersRes.status === 'rejected') {
-      errors.push(usersRes.reason?.response?.data?.message || 'users');
-    }
-    if (deptRes.status === 'rejected') {
-      errors.push(deptRes.reason?.response?.data?.message || 'departments');
-    }
-    if (errors.length) {
-      setListError(`Could not load admin data: ${errors.join(' | ')}`);
-    }
+    if (usersRes.status === 'rejected') errors.push(usersRes.reason?.response?.data?.message || 'users');
+    if (deptRes.status === 'rejected') errors.push(deptRes.reason?.response?.data?.message || 'departments');
+    if (errors.length) setListError(`Could not load admin data: ${errors.join(' | ')}`);
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => {
+      loadData();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [loadData]);
+
+  const changeSection = (section) => {
+    setSearchParams({ section });
+    setPage(1);
+  };
 
   const handleDeptSubmit = async (e) => {
     e.preventDefault();
@@ -81,13 +90,12 @@ export default function AdminPanelPage() {
   };
 
   const deleteDept = async (id) => {
-    if (!window.confirm('Delete this department? Users must be reassigned first.')) return;
     try {
       await axios.delete(`/api/departments/${id}`, authHeaders());
+      setConfirmAction(null);
       await loadData();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Could not delete department.';
-      setListError(msg);
+      setListError(err.response?.data?.message || 'Could not delete department.');
     }
   };
 
@@ -116,83 +124,232 @@ export default function AdminPanelPage() {
         role: editForm.role,
         department_id: editForm.department_id,
       };
-      if (editForm.password.trim()) {
-        body.password = editForm.password.trim();
-      }
+      if (editForm.password.trim()) body.password = editForm.password.trim();
       await axios.put(`/api/users/${editingUser}`, body, authHeaders());
       cancelEditUser();
       await loadData();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Could not update user.';
-      setListError(msg);
+      setListError(err.response?.data?.message || 'Could not update user.');
     }
   };
 
   const deleteUser = async (id) => {
-    if (!window.confirm('Delete this user? This may fail if they have related messages.')) return;
     try {
       await axios.delete(`/api/users/${id}`, authHeaders());
       if (editingUser === id) cancelEditUser();
+      setConfirmAction(null);
       await loadData();
     } catch (err) {
-      const msg = err.response?.data?.message || 'Could not delete user.';
-      setListError(msg);
+      setListError(err.response?.data?.message || 'Could not delete user.');
     }
   };
 
+  const departmentName = (departmentId) => departments.find((d) => d.id === departmentId)?.name ?? 'Unassigned';
+  const pageSize = 8;
+  const filteredUsers = useMemo(() => {
+    const query = userSearch.trim().toLowerCase();
+    return users.filter((user) => {
+      const matchesQuery = !query ||
+        String(user.name || '').toLowerCase().includes(query) ||
+        String(user.email || '').toLowerCase().includes(query);
+      const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+      const matchesDepartment = departmentFilter === 'all' || String(user.department_id || '') === departmentFilter;
+      return matchesQuery && matchesRole && matchesDepartment;
+    });
+  }, [departmentFilter, roleFilter, userSearch, users]);
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
+  const adminCount = users.filter((user) => user.role === 'admin').length;
+  const staffCount = users.filter((user) => user.role !== 'admin').length;
+
   return (
     <div className="admin-panel-container">
-      <h2>Admin Panel</h2>
+      <div className="page-title-row">
+        <div>
+          <h2>Admin Panel</h2>
+          <p className="admin-panel-hint">Manage organization users, departments, roles, and access structure.</p>
+        </div>
+      </div>
       {listError ? <div className="admin-banner-error">{listError}</div> : null}
 
-      <div className="detail-section">
-        <h3>Create User</h3>
-        <p className="admin-panel-hint">Add a new staff or admin account on the registration screen.</p>
+      <div className="admin-stats-grid">
+        <div className="admin-stat-card"><span>Total Users</span><strong>{users.length}</strong></div>
+        <div className="admin-stat-card"><span>Admins</span><strong>{adminCount}</strong></div>
+        <div className="admin-stat-card"><span>Staff</span><strong>{staffCount}</strong></div>
+        <div className="admin-stat-card"><span>Departments</span><strong>{departments.length}</strong></div>
+      </div>
+
+      <div className="admin-section-switch">
         <button
           type="button"
-          className="admin-create-user-btn"
-          onClick={() => {
-            sessionStorage.setItem(ADMIN_REGISTER_SESSION_KEY, '1');
-            navigate('/register', { state: { fromAdmin: true } });
-          }}
+          className={activeSection === 'users' ? 'admin-switch-btn admin-switch-btn--active' : 'admin-switch-btn'}
+          onClick={() => changeSection('users')}
         >
-          Create User
+          Users
+        </button>
+        <button
+          type="button"
+          className={activeSection === 'departments' ? 'admin-switch-btn admin-switch-btn--active' : 'admin-switch-btn'}
+          onClick={() => changeSection('departments')}
+        >
+          Departments
         </button>
       </div>
 
-      <div className="detail-section">
-        <h3>Create Department</h3>
-        <form onSubmit={handleDeptSubmit}>
-          <input type="text" placeholder="Department Name" value={deptName} onChange={(e) => setDeptName(e.target.value)} required />
-          <button type="submit">Create Department</button>
-        </form>
-      </div>
+      {activeSection === 'users' ? (
+        <div className="detail-section admin-dropdown-section">
+          <div className="admin-section-heading">
+            <div>
+              <h3>Users</h3>
+              <p className="admin-panel-hint">Create, edit, and delete staff or admin accounts.</p>
+            </div>
+            <button
+              type="button"
+              className="admin-create-user-btn"
+              onClick={() => {
+                sessionStorage.setItem(ADMIN_REGISTER_SESSION_KEY, '1');
+                navigate('/register', { state: { fromAdmin: true } });
+              }}
+            >
+              Create User
+            </button>
+          </div>
 
-      <div className="detail-section">
-        <h3>Departments</h3>
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th className="admin-table-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <div className="admin-toolbar">
+            <input
+              type="search"
+              placeholder="Search users by name or email"
+              value={userSearch}
+              onChange={(e) => {
+                setUserSearch(e.target.value);
+                setPage(1);
+              }}
+            />
+            <select value={roleFilter} onChange={(e) => {
+              setRoleFilter(e.target.value);
+              setPage(1);
+            }}>
+              <option value="all">All roles</option>
+              <option value="admin">Admin</option>
+              <option value="staff">Staff</option>
+            </select>
+            <select value={departmentFilter} onChange={(e) => {
+              setDepartmentFilter(e.target.value);
+              setPage(1);
+            }}>
+              <option value="all">All departments</option>
               {departments.map((d) => (
-                <tr key={d.id}>
-                  <td>
+                <option key={d.id} value={d.id}>{d.name}</option>
+              ))}
+            </select>
+          </div>
+
+          {editingUser ? (
+            <div className="admin-edit-user">
+              <h4 className="admin-edit-user-title">Edit user</h4>
+              <div className="admin-edit-user-grid">
+                <input type="text" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
+                <input type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
+                <input type="password" placeholder="New password (optional)" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
+                <select value={editForm.role} onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}>
+                  <option value="staff">Staff</option>
+                  <option value="admin">Admin</option>
+                </select>
+                <select value={editForm.department_id} onChange={(e) => setEditForm((f) => ({ ...f, department_id: e.target.value }))} required>
+                  <option value="">Select department</option>
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="admin-edit-user-actions">
+                <button type="button" onClick={saveUser}>Save changes</button>
+                <button type="button" className="secondary-btn" onClick={cancelEditUser}>Cancel</button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="admin-table-wrap">
+            <table className="admin-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Department</th>
+                  <th className="admin-table-actions">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {visibleUsers.map((u) => (
+                  <tr key={u.id}>
+                    <td>
+                      <strong>{u.name}</strong>
+                      <div className="user-status-row">
+                        <span className="status-badge status-badge--active">Active</span>
+                      </div>
+                    </td>
+                    <td>{u.email}</td>
+                    <td><span className={`status-badge status-badge--${u.role === 'admin' ? 'admin' : 'staff'}`}>{u.role}</span></td>
+                    <td>{departmentName(u.department_id)}</td>
+                    <td className="admin-table-actions">
+                      <div className="table-action-row">
+                        <button type="button" className="admin-row-btn" onClick={() => startEditUser(u)}>Edit</button>
+                        <button
+                          type="button"
+                          className="admin-row-btn danger-btn danger-btn--soft"
+                          onClick={() => setConfirmAction({ type: 'user', id: u.id, label: u.name })}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {!visibleUsers.length ? (
+                  <tr>
+                    <td colSpan="5"><div className="empty-state">No users match the current filters.</div></td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+          <div className="pagination-row">
+            <button type="button" className="secondary-btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button type="button" className="secondary-btn" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
+          </div>
+        </div>
+      ) : null}
+
+      {activeSection === 'departments' ? (
+        <div className="detail-section admin-dropdown-section">
+          <div className="admin-section-heading">
+            <div>
+              <h3>Departments</h3>
+              <p className="admin-panel-hint">Manage departments and the users assigned to each department.</p>
+            </div>
+          </div>
+
+          <form className="admin-create-dept-form" onSubmit={handleDeptSubmit}>
+            <input type="text" placeholder="Department Name" value={deptName} onChange={(e) => setDeptName(e.target.value)} required />
+            <button type="submit">Create Department</button>
+          </form>
+
+          <div className="department-grid">
+            {departments.map((d) => {
+              const deptUsers = users.filter((u) => u.department_id === d.id);
+              return (
+                <section className="department-card" key={d.id}>
+                  <div className="department-card-header">
                     {editingDeptId === d.id ? (
-                      <input
-                        className="admin-inline-input"
-                        value={editingDeptName}
-                        onChange={(e) => setEditingDeptName(e.target.value)}
-                      />
+                      <input className="admin-inline-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} />
                     ) : (
-                      d.name
+                      <h4>{d.name}</h4>
                     )}
-                  </td>
-                  <td className="admin-table-actions">
+                    <span className="badge">{deptUsers.length}</span>
+                  </div>
+                  <div className="admin-edit-user-actions">
                     {editingDeptId === d.id ? (
                       <>
                         <button type="button" className="admin-row-btn" onClick={() => saveDept(d.id)}>Save</button>
@@ -200,72 +357,56 @@ export default function AdminPanelPage() {
                       </>
                     ) : (
                       <>
-                        <button type="button" className="admin-row-btn" onClick={() => startEditDept(d)}>Edit</button>
-                        <button type="button" className="admin-row-btn danger-btn" onClick={() => deleteDept(d.id)}>Delete</button>
+                        <button type="button" className="admin-row-btn" onClick={() => startEditDept(d)}>Edit Department</button>
+                        <button type="button" className="admin-row-btn danger-btn danger-btn--soft" onClick={() => setConfirmAction({ type: 'department', id: d.id, label: d.name })}>Delete Department</button>
                       </>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <ul className="department-user-list">
+                    {deptUsers.length ? deptUsers.map((u) => (
+                      <li key={u.id}>
+                        <div>
+                          <strong>{u.name}</strong>
+                          <span>{u.email}</span>
+                        </div>
+                        <div className="department-user-actions">
+                          <button type="button" className="admin-row-btn" onClick={() => {
+                            changeSection('users');
+                            startEditUser(u);
+                          }}>Edit</button>
+                          <button type="button" className="admin-row-btn danger-btn danger-btn--soft" onClick={() => setConfirmAction({ type: 'user', id: u.id, label: u.name })}>Delete</button>
+                        </div>
+                      </li>
+                    )) : <li className="department-empty">No users assigned.</li>}
+                  </ul>
+                </section>
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <div className="detail-section">
-        <h3>Users</h3>
-        {editingUser ? (
-          <div className="admin-edit-user">
-            <h4 className="admin-edit-user-title">Edit user</h4>
-            <div className="admin-edit-user-grid">
-              <input type="text" placeholder="Name" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} />
-              <input type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
-              <input type="password" placeholder="New password (optional)" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
-              <select value={editForm.role} onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}>
-                <option value="staff">Staff</option>
-                <option value="admin">Admin</option>
-              </select>
-              <select value={editForm.department_id} onChange={(e) => setEditForm((f) => ({ ...f, department_id: e.target.value }))} required>
-                <option value="">Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-            <div className="admin-edit-user-actions">
-              <button type="button" onClick={saveUser}>Save changes</button>
-              <button type="button" className="secondary-btn" onClick={cancelEditUser}>Cancel</button>
+      {confirmAction ? (
+        <div className="modal-backdrop" role="presentation">
+          <div className="confirm-modal" role="dialog" aria-modal="true" aria-labelledby="confirm-delete-title">
+            <h3 id="confirm-delete-title">Confirm deletion</h3>
+            <p>
+              Delete {confirmAction.type === 'department' ? 'department' : 'user'} <strong>{confirmAction.label}</strong>?
+              This action may fail if related records still exist.
+            </p>
+            <div className="confirm-modal-actions">
+              <button type="button" className="secondary-btn" onClick={() => setConfirmAction(null)}>Cancel</button>
+              <button
+                type="button"
+                className="danger-btn danger-btn--soft"
+                onClick={() => confirmAction.type === 'department' ? deleteDept(confirmAction.id) : deleteUser(confirmAction.id)}
+              >
+                Delete
+              </button>
             </div>
           </div>
-        ) : null}
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Department</th>
-                <th className="admin-table-actions">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td>{u.name}</td>
-                  <td>{u.email}</td>
-                  <td>{u.role}</td>
-                  <td>{departments.find((d) => d.id === u.department_id)?.name ?? '—'}</td>
-                  <td className="admin-table-actions">
-                    <button type="button" className="admin-row-btn" onClick={() => startEditUser(u)}>Edit</button>
-                    <button type="button" className="admin-row-btn danger-btn" onClick={() => deleteUser(u.id)}>Delete</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

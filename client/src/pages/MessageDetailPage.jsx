@@ -2,6 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import RecipientPicker from '../components/RecipientPicker';
+import { notify } from '../utils/notify';
+
+function formatEventType(type) {
+  return String(type || '')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export default function MessageDetailPage() {
   const { id } = useParams();
@@ -12,16 +19,12 @@ export default function MessageDetailPage() {
   const [forwardNote, setForwardNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
+  const [isForwarding, setIsForwarding] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const token = localStorage.getItem('token');
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
-  const currentRole = (() => {
-    try {
-      const payload = JSON.parse(atob((token || '').split('.')[1] || ''));
-      return payload?.role || '';
-    } catch {
-      return '';
-    }
-  })();
 
   const loadMessage = useCallback(async () => {
     const res = await axios.get(`/api/messages/${id}`, { headers: authHeaders });
@@ -38,17 +41,20 @@ export default function MessageDetailPage() {
     Promise.all([
       axios.get(`/api/messages/${id}`, { headers: authHeaders }),
       axios.get(`/api/messages/${id}/history`, { headers: authHeaders }),
-      axios.get('/api/users/recipients', { headers: authHeaders }),
-      axios.patch(`/api/messages/${id}/read`, {}, { headers: authHeaders })
+      axios.get('/api/users/recipients', { headers: authHeaders })
     ]).then(([messageRes, historyRes, recipientsRes]) => {
       if (ignore) return;
       setMessage(messageRes.data);
       setHistory(Array.isArray(historyRes.data) ? historyRes.data : []);
       setRecipients(Array.isArray(recipientsRes.data) ? recipientsRes.data : []);
+      setError('');
+      axios.patch(`/api/messages/${id}/read`, {}, { headers: authHeaders }).catch(() => {});
     }).catch((err) => {
       if (ignore) return;
       const apiMessage = err?.response?.data?.message;
       setError(apiMessage || 'Message not found');
+    }).finally(() => {
+      if (!ignore) setLoading(false);
     });
     return () => {
       ignore = true;
@@ -57,6 +63,7 @@ export default function MessageDetailPage() {
 
   const handleSubmitDraft = async () => {
     try {
+      setIsSubmittingDraft(true);
       await axios.post(`/api/messages/${id}/submit`, {}, { headers: authHeaders });
       setFeedback('Draft submitted.');
       setError('');
@@ -64,6 +71,8 @@ export default function MessageDetailPage() {
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
       setError(apiMessage || 'Could not submit draft.');
+    } finally {
+      setIsSubmittingDraft(false);
     }
   };
 
@@ -73,12 +82,14 @@ export default function MessageDetailPage() {
         setError('Please select at least one receiver.');
         return;
       }
+      setIsForwarding(true);
       await axios.post(
         `/api/messages/${id}/forward`,
         { new_receiver_ids: forwardTo, new_receiver_id: forwardTo[0] || '', note: forwardNote },
         { headers: authHeaders }
       );
       setFeedback('Message forwarded.');
+      notify({ type: 'success', title: 'Message Sent confirmation', message: 'Message was forwarded successfully.' });
       setError('');
       setForwardTo([]);
       setForwardNote('');
@@ -86,11 +97,37 @@ export default function MessageDetailPage() {
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
       setError(apiMessage || 'Could not forward message.');
+      notify({ type: 'error', title: 'System alert', message: apiMessage || 'Could not forward message.' });
+    } finally {
+      setIsForwarding(false);
     }
   };
 
-  if (error && !message) return <div>{error}</div>;
-  if (!message) return <div>Loading...</div>;
+  const handleAttachmentDownload = async () => {
+    try {
+      setIsDownloading(true);
+      setError('');
+      const res = await axios.get(`/api/messages/${message.id}/attachment`, {
+        headers: authHeaders,
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = String(message.file_path || 'attachment').split(/[\\/]/).pop() || 'attachment';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not download attachment.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  if (error && !message) return <div className="message-detail-container"><div className="error banner-message">{error}</div></div>;
+  if (loading || !message) return <div className="message-detail-container"><div className="list-state">Loading message...</div></div>;
 
   return (
     <div className="message-detail-container">
@@ -104,14 +141,16 @@ export default function MessageDetailPage() {
       </div>
       <p className="message-content">{message.content}</p>
       {message.file_path && (
-        <a className="attachment-link" href={`/api/messages/${message.id}/attachment`} target="_blank" rel="noopener noreferrer">
-          Download Attachment
-        </a>
+        <button type="button" className="attachment-link-button" onClick={handleAttachmentDownload} disabled={isDownloading}>
+          {isDownloading ? 'Downloading...' : 'Download Attachment'}
+        </button>
       )}
 
       {message.status === 'draft' && (
         <div className="detail-section">
-          <button onClick={handleSubmitDraft}>Submit Draft</button>
+          <button onClick={handleSubmitDraft} disabled={isSubmittingDraft}>
+            {isSubmittingDraft ? 'Submitting...' : 'Submit Draft'}
+          </button>
         </div>
       )}
 
@@ -129,7 +168,9 @@ export default function MessageDetailPage() {
           value={forwardNote}
           onChange={(e) => setForwardNote(e.target.value)}
         />
-        <button className="forward-btn" onClick={handleForward}>Forward</button>
+        <button className="forward-btn" onClick={handleForward} disabled={isForwarding}>
+          {isForwarding ? 'Forwarding...' : 'Forward'}
+        </button>
       </div>
 
       {feedback && <div className="success">{feedback}</div>}
@@ -140,10 +181,13 @@ export default function MessageDetailPage() {
         <ul className="history-list">
           {history.map((evt) => (
             <li key={evt.id}>
-              {evt.event_type} by {evt.actor_name || `User ${evt.actor_id || '-'}`} at {new Date(evt.created_at).toLocaleString()}
+              <strong>{formatEventType(evt.event_type)}</strong>
+              {' '}by {evt.actor_name || `User ${evt.actor_id || '-'}`} at {new Date(evt.created_at).toLocaleString()}
+              {evt.reference_number ? ` - ${evt.reference_number}` : ''}
               {evt.note ? ` (${evt.note})` : ''}
             </li>
           ))}
+          {!history.length ? <li>No history recorded yet.</li> : null}
         </ul>
       </div>
     </div>
