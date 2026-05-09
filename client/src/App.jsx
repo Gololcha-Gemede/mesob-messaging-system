@@ -98,6 +98,17 @@ function ToastHost() {
 	);
 }
 
+function getProfileInitial(profile) {
+	const name = String(profile?.name || profile?.email || 'U').trim();
+	return (name[0] || 'U').toUpperCase();
+}
+
+function profileImageSrc(profile) {
+	const path = profile?.profile_image_path;
+	if (!path) return '';
+	return String(path).startsWith('http') ? path : path;
+}
+
 function NavBar() {
 	const token = localStorage.getItem('token');
 	const navigate = useNavigate();
@@ -109,11 +120,17 @@ function NavBar() {
 	const [notificationCount, setNotificationCount] = useState(0);
 	const [profile, setProfile] = useState(null);
 	const [editingProfile, setEditingProfile] = useState(false);
-	const [profileForm, setProfileForm] = useState({ name: '', email: '', password: '' });
+	const [profileForm, setProfileForm] = useState({ name: '', email: '', password: '', profile_image: null });
 	const [profileSaving, setProfileSaving] = useState(false);
 	const [profileMessage, setProfileMessage] = useState('');
+	const [pinnedMenu, setPinnedMenu] = useState(null);
 	const navActionsRef = useRef(null);
 	const lastNotificationCountRef = useRef(null);
+	const editingProfileRef = useRef(false);
+
+	useEffect(() => {
+		editingProfileRef.current = editingProfile;
+	}, [editingProfile]);
 
 	useEffect(() => {
 		if (!token) return;
@@ -136,11 +153,14 @@ function NavBar() {
 			}
 			if (profileRes.status === 'fulfilled') {
 				setProfile(profileRes.value.data);
-				setProfileForm({
-					name: profileRes.value.data?.name || '',
-					email: profileRes.value.data?.email || '',
-					password: ''
-				});
+				if (!editingProfileRef.current) {
+					setProfileForm({
+						name: profileRes.value.data?.name || '',
+						email: profileRes.value.data?.email || '',
+						password: '',
+						profile_image: null
+					});
+				}
 			}
 		});
 		loadNavData();
@@ -158,6 +178,7 @@ function NavBar() {
 				setProfileOpen(false);
 				setEditingProfile(false);
 				setProfileMessage('');
+				setPinnedMenu(null);
 			}
 		};
 		document.addEventListener('pointerdown', closeMenus);
@@ -168,6 +189,7 @@ function NavBar() {
 		localStorage.removeItem('token');
 		setProfileOpen(false);
 		setNotificationsOpen(false);
+		setPinnedMenu(null);
 		navigate('/login');
 	};
 
@@ -176,11 +198,16 @@ function NavBar() {
 		setProfileSaving(true);
 		setProfileMessage('');
 		try {
-			const res = await axios.put('/api/auth/me', profileForm, {
+			const body = new FormData();
+			body.append('name', profileForm.name);
+			body.append('email', profileForm.email);
+			if (profileForm.password) body.append('password', profileForm.password);
+			if (profileForm.profile_image) body.append('profile_image', profileForm.profile_image);
+			const res = await axios.put('/api/auth/me', body, {
 				headers: { Authorization: `Bearer ${token}` }
 			});
 			setProfile(res.data);
-			setProfileForm({ name: res.data.name || '', email: res.data.email || '', password: '' });
+			setProfileForm({ name: res.data.name || '', email: res.data.email || '', password: '', profile_image: null });
 			setEditingProfile(false);
 			setProfileMessage('Profile updated.');
 		} catch (err) {
@@ -202,6 +229,24 @@ function NavBar() {
 			notify({ type: 'error', title: 'Could not update notification', message: 'Please try again.' });
 		}
 	};
+
+	const closeHoverMenus = () => {
+		setNotificationsOpen(false);
+		setProfileOpen(false);
+		setEditingProfile(false);
+		setProfileMessage('');
+	};
+
+	const closeMenuAfterNavigation = () => {
+		setNotificationsOpen(false);
+		setPinnedMenu(null);
+	};
+
+	const closeUnpinnedMenus = () => {
+		if (!pinnedMenu) closeHoverMenus();
+	};
+
+	const profilePhoto = profileImageSrc(profile);
 
 	return (
 		<header>
@@ -229,16 +274,20 @@ function NavBar() {
 								<div
 									className="top-nav-menu"
 									onMouseEnter={() => {
+										if (pinnedMenu) return;
 										setNotificationsOpen(true);
 										setProfileOpen(false);
 									}}
+									onMouseLeave={closeUnpinnedMenus}
 								>
 									<button
 										type="button"
 										className="icon-btn"
 										aria-label="Notifications"
 										onClick={() => {
-											setNotificationsOpen((open) => !open);
+											const shouldOpen = pinnedMenu !== 'notifications' || !notificationsOpen;
+											setPinnedMenu(shouldOpen ? 'notifications' : null);
+											setNotificationsOpen(shouldOpen);
 											setProfileOpen(false);
 										}}
 									>
@@ -256,7 +305,7 @@ function NavBar() {
 													{notifications.map((msg) => (
 														<li key={msg.id}>
 															<div className="notification-card">
-																<Link to={`/messages/${msg.id}`} onClick={() => setNotificationsOpen(false)}>
+																<Link to={`/messages/${msg.id}`} onClick={closeMenuAfterNavigation}>
 																	<span>{msg.subject || '(No subject)'}</span>
 																	<small>{msg.reference_number}</small>
 																</Link>
@@ -276,22 +325,30 @@ function NavBar() {
 								<div
 									className="top-nav-menu"
 									onMouseEnter={() => {
+										if (pinnedMenu) return;
 										setProfileOpen(true);
 										setNotificationsOpen(false);
 									}}
+									onMouseLeave={closeUnpinnedMenus}
 								>
 									<button
 										type="button"
 										className="icon-btn"
 										aria-label="Profile"
 										onClick={() => {
-											setProfileOpen((open) => !open);
+											const shouldOpen = pinnedMenu !== 'profile' || !profileOpen;
+											setPinnedMenu(shouldOpen ? 'profile' : null);
+											setProfileOpen(shouldOpen);
 											setNotificationsOpen(false);
 											setEditingProfile(false);
 											setProfileMessage('');
 										}}
 									>
-										<Icon name="profile" />
+										{profilePhoto ? (
+											<img className="profile-avatar-img" src={profilePhoto} alt="" />
+										) : (
+											<span className="profile-avatar-fallback">{getProfileInitial(profile)}</span>
+										)}
 									</button>
 									{profileOpen ? (
 										<div className="top-popover profile-popover">
@@ -319,6 +376,14 @@ function NavBar() {
 														onChange={(e) => setProfileForm((form) => ({ ...form, password: e.target.value }))}
 														autoComplete="new-password"
 													/>
+													<label className="profile-file-field">
+														<span>Profile picture</span>
+														<input
+															type="file"
+															accept="image/*"
+															onChange={(e) => setProfileForm((form) => ({ ...form, profile_image: e.target.files?.[0] || null }))}
+														/>
+													</label>
 													<div className="profile-action-row">
 														<button type="submit" disabled={profileSaving}>{profileSaving ? 'Saving...' : 'Save'}</button>
 														<button type="button" className="secondary-btn" onClick={() => setEditingProfile(false)}>Cancel</button>
@@ -331,7 +396,15 @@ function NavBar() {
 													<p>{profile?.email || 'Email unavailable'}</p>
 													<span className="status-pill status-submitted">{profile?.role || 'user'}</span>
 													<div className="profile-action-row">
-														<button type="button" onClick={() => setEditingProfile(true)}>Edit</button>
+														<button type="button" onClick={() => {
+															setProfileForm({
+																name: profile?.name || '',
+																email: profile?.email || '',
+																password: '',
+																profile_image: null
+															});
+															setEditingProfile(true);
+														}}>Edit</button>
 														<button type="button" className="profile-logout-btn" onClick={logout}>Logout</button>
 													</div>
 													{profileMessage ? <div className="profile-message">{profileMessage}</div> : null}

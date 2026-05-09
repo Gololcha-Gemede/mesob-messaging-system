@@ -47,10 +47,13 @@ module.exports = {
          FROM messages child
          JOIN chain ON child.parent_message_id = chain.id
        )
-       SELECT me.*, u.name AS actor_name, c.reference_number, c.subject, c.chain_depth, c.chain_path
+       SELECT me.*, u.name AS actor_name, c.reference_number, c.subject, c.sender_id, c.receiver_id,
+              c.parent_message_id, s.name AS sender_name, r.name AS receiver_name, c.chain_depth, c.chain_path
        FROM chain c
        JOIN message_events me ON me.message_id = c.id
        LEFT JOIN users u ON u.id = me.actor_id
+       LEFT JOIN users s ON s.id = c.sender_id
+       LEFT JOIN users r ON r.id = c.receiver_id
        ORDER BY c.chain_path ASC, me.id ASC`,
       [messageId]
     );

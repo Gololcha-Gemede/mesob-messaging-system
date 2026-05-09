@@ -25,6 +25,17 @@ export default function MessageDetailPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const token = localStorage.getItem('token');
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const visibleHistory = useMemo(() => {
+    const forwardedChildren = new Set(
+      history
+        .filter((evt) => evt.event_type === 'forwarded' && evt.parent_message_id)
+        .map((evt) => `${evt.parent_message_id}:${evt.actor_id || ''}:${evt.note || ''}`)
+    );
+    return history.filter((evt) => {
+      if (evt.event_type !== 'forwarded' || evt.parent_message_id) return true;
+      return !forwardedChildren.has(`${evt.message_id}:${evt.actor_id || ''}:${evt.note || ''}`);
+    });
+  }, [history]);
 
   const loadMessage = useCallback(async () => {
     const res = await axios.get(`/api/messages/${id}`, { headers: authHeaders });
@@ -179,15 +190,16 @@ export default function MessageDetailPage() {
       <div className="detail-section">
         <h3>History</h3>
         <ul className="history-list">
-          {history.map((evt) => (
+          {visibleHistory.map((evt) => (
             <li key={evt.id}>
               <strong>{formatEventType(evt.event_type)}</strong>
               {' '}by {evt.actor_name || `User ${evt.actor_id || '-'}`} at {new Date(evt.created_at).toLocaleString()}
+              {evt.event_type === 'forwarded' && evt.parent_message_id ? ` to ${evt.receiver_name || `User ${evt.receiver_id || '-'}`}` : ''}
               {evt.reference_number ? ` - ${evt.reference_number}` : ''}
               {evt.note ? ` (${evt.note})` : ''}
             </li>
           ))}
-          {!history.length ? <li>No history recorded yet.</li> : null}
+          {!visibleHistory.length ? <li>No history recorded yet.</li> : null}
         </ul>
       </div>
     </div>

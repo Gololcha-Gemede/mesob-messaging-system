@@ -3,6 +3,10 @@ const jwt = require('jsonwebtoken');
 const userModel = require('../models/user');
 require('dotenv').config();
 
+function uploadedProfilePath(file) {
+  return file?.filename ? `/uploads/${file.filename}` : undefined;
+}
+
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   const user = await userModel.findByEmail(email);
@@ -10,7 +14,16 @@ exports.login = async (req, res) => {
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) return res.status(400).json({ message: 'Invalid credentials' });
   const token = jwt.sign({ id: user.id, role: user.role, department_id: user.department_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-  res.json({ token, user: { id: user.id, name: user.name, role: user.role, department_id: user.department_id } });
+  res.json({
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      role: user.role,
+      department_id: user.department_id,
+      profile_image_path: user.profile_image_path
+    }
+  });
 };
 
 exports.me = async (req, res) => {
@@ -22,7 +35,8 @@ exports.me = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      department_id: user.department_id
+      department_id: user.department_id,
+      profile_image_path: user.profile_image_path
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching profile', error: err.message });
@@ -51,6 +65,8 @@ exports.updateMe = async (req, res) => {
       department_id: user.department_id
     };
     if (password) payload.password = await bcrypt.hash(password, 10);
+    const profileImagePath = uploadedProfilePath(req.file);
+    if (profileImagePath !== undefined) payload.profile_image_path = profileImagePath;
     await userModel.update(req.user.id, payload);
 
     res.json({
@@ -58,7 +74,8 @@ exports.updateMe = async (req, res) => {
       name,
       email,
       role: user.role,
-      department_id: user.department_id
+      department_id: user.department_id,
+      profile_image_path: payload.profile_image_path ?? user.profile_image_path
     });
   } catch (err) {
     res.status(500).json({ message: 'Error updating profile', error: err.message });
