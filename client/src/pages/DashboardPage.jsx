@@ -36,10 +36,10 @@ export default function DashboardPage() {
     { key: 'sent', label: 'Sent Messages', icon: 'SE', value: counts.sent, tone: 'green' },
     { key: 'received', label: 'Received Messages', icon: 'RC', value: counts.received ?? counts.inbox, tone: 'gold' },
     { key: 'drafts', label: 'Draft Messages', icon: 'DR', value: counts.drafts, tone: 'slate' },
-    { key: 'archived', label: 'Archived Messages', icon: 'AR', value: counts.archived, tone: 'blue' },
-    { key: 'unread', label: 'Unread Messages', icon: 'UN', value: counts.unread, tone: 'danger' },
-    { key: 'active_users', label: 'Active Users', icon: 'AU', value: counts.active_users, tone: 'green' },
-    { key: 'department_activity', label: 'Department Activity', icon: 'DA', value: counts.department_activity, tone: 'gold' }
+    ...(isAdmin ? [
+      { key: 'active_users', label: 'Active Users', icon: 'AU', value: counts.active_users, tone: 'green' },
+      { key: 'department_activity', label: 'Department Activity', icon: 'DA', value: counts.department_activity, tone: 'gold' }
+    ] : [])
   ];
 
   useEffect(() => {
