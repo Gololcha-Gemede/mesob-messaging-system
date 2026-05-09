@@ -1,1 +1,2 @@
 The naming formats so as to enable filtering(by department) while selecting recipients and the ability to select multiple recipients and send to multiple users at once 
+Hovereffect on profile icon and notification icon, tracking forwarded messages,under admin dropdown remove user button inside department page and viceversa,department page refining, dashboard page refining,mark as read functionality in the notification functionality,change favicon to mesob logo

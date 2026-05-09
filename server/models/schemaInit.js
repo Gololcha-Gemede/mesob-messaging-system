@@ -39,6 +39,11 @@ async function initSchema() {
   if (!indexes.length) {
     await pool.query('CREATE UNIQUE INDEX uniq_reference_number ON messages (reference_number)');
   }
+
+  const [parentIndexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'idx_messages_parent_message_id'");
+  if (!parentIndexes.length) {
+    await pool.query('CREATE INDEX idx_messages_parent_message_id ON messages (parent_message_id)');
+  }
 }
 
 module.exports = { initSchema };
