@@ -52,6 +52,21 @@ function parseRecipientIds(value) {
   )];
 }
 
+function parseBoolean(value) {
+  return value === true || value === 'true' || value === '1' || value === 1;
+}
+
+function cleanLetterHtml(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\sjavascript:/gi, '');
+}
+
 function canAccessMessage(user, message) {
   if (message.status === 'draft') return Number(message.sender_id) === Number(user.id);
   if (user.role === 'admin') return true;
@@ -62,7 +77,10 @@ async function createMessageWithReference(payload, departmentId, maxAttempts = 5
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const reference_number = await generateReferenceNumber(departmentId);
     try {
-      const messageId = await messageModel.create({ ...payload, reference_number });
+      const letter_html = typeof payload.letter_html === 'string'
+        ? payload.letter_html.replace(/__SYSTEM_REFERENCE_NUMBER__/g, reference_number)
+        : payload.letter_html;
+      const messageId = await messageModel.create({ ...payload, letter_html, reference_number });
       return { messageId, reference_number };
     } catch (err) {
       if (err.code !== 'ER_DUP_ENTRY' || attempt === maxAttempts - 1) throw err;
@@ -86,7 +104,7 @@ async function forwardMessageWithReference(payload, departmentId, maxAttempts = 
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date } = req.body;
+    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, is_formal_letter, letter_html, pdf_path } = req.body;
     const sender_id = req.user.id;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
     const effectiveDepartmentId = req.user.department_id || department_id || await getUserDepartmentId(sender_id);
@@ -106,6 +124,8 @@ exports.sendMessage = async (req, res) => {
 
     const status = normalizedAction === 'draft' ? 'draft' : 'submitted';
     const file_path = req.file ? req.file.path : null;
+    const formalLetterEnabled = parseBoolean(is_formal_letter);
+    const sanitizedLetterHtml = formalLetterEnabled ? cleanLetterHtml(letter_html) : null;
     const receiversToCreate = selectedReceiverIds.length ? selectedReceiverIds : [null];
     const createdMessages = [];
 
@@ -118,7 +138,10 @@ exports.sendMessage = async (req, res) => {
         status,
         file_path,
         department_id: effectiveDepartmentId,
-        due_date: due_date || null
+        due_date: due_date || null,
+        is_formal_letter: formalLetterEnabled ? 1 : 0,
+        letter_html: sanitizedLetterHtml,
+        pdf_path: formalLetterEnabled && typeof pdf_path === 'string' && pdf_path.trim() ? pdf_path.trim() : null
       }, effectiveDepartmentId);
       await messageEventModel.create({
         message_id: messageId,

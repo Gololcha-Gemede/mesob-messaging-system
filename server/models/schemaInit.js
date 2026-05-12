@@ -34,6 +34,9 @@ async function initSchema() {
   await ensureColumn('messages', 'parent_message_id', 'parent_message_id INT NULL');
   await ensureColumn('messages', 'due_date', 'due_date DATE NULL');
   await ensureColumn('messages', 'created_at', 'created_at DATETIME NULL');
+  await ensureColumn('messages', 'is_formal_letter', 'is_formal_letter TINYINT(1) NOT NULL DEFAULT 0');
+  await ensureColumn('messages', 'letter_html', 'letter_html MEDIUMTEXT NULL');
+  await ensureColumn('messages', 'pdf_path', 'pdf_path VARCHAR(255) NULL');
   await ensureColumn('users', 'profile_image_path', 'profile_image_path VARCHAR(255) NULL');
 
   const [indexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'uniq_reference_number'");

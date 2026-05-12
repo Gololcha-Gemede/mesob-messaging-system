@@ -150,7 +150,11 @@ export default function MessageDetailPage() {
         <div><strong>Status:</strong> <span className={`status-pill status-${message.status}`}>{message.status}</span></div>
         {message.due_date && <div><strong>Due date:</strong> {String(message.due_date).slice(0, 10)}</div>}
       </div>
-      <p className="message-content">{message.content}</p>
+      {message.is_formal_letter && message.letter_html ? (
+        <div className="formal-letter-view" dangerouslySetInnerHTML={{ __html: message.letter_html }} />
+      ) : (
+        <p className="message-content">{message.content}</p>
+      )}
       {message.file_path && (
         <button type="button" className="attachment-link-button" onClick={handleAttachmentDownload} disabled={isDownloading}>
           {isDownloading ? 'Downloading...' : 'Download Attachment'}

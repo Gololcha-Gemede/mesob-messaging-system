@@ -11,12 +11,16 @@ module.exports = {
       status,
       file_path,
       department_id,
-      due_date = null
+      due_date = null,
+      is_formal_letter = 0,
+      letter_html = null,
+      pdf_path = null
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, due_date, submitted_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, due_date,
+        is_formal_letter, letter_html, pdf_path, submitted_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         sender_id,
         receiver_id,
@@ -27,6 +31,9 @@ module.exports = {
         file_path,
         department_id,
         due_date,
+        is_formal_letter ? 1 : 0,
+        letter_html,
+        pdf_path,
         status === 'submitted' ? new Date() : null
       ]
     );
@@ -252,9 +259,24 @@ module.exports = {
     const msg = original[0];
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, parent_message_id, due_date, submitted_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [actor_id, new_receiver_id, msg.subject, msg.content, reference_number, 'submitted', msg.file_path, msg.department_id, msg.id, due_date]
+        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, parent_message_id,
+        due_date, is_formal_letter, letter_html, pdf_path, submitted_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+      [
+        actor_id,
+        new_receiver_id,
+        msg.subject,
+        msg.content,
+        reference_number,
+        'submitted',
+        msg.file_path,
+        msg.department_id,
+        msg.id,
+        due_date,
+        msg.is_formal_letter ? 1 : 0,
+        msg.letter_html,
+        msg.pdf_path
+      ]
     );
     return result.insertId;
   },

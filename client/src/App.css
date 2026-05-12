@@ -1280,7 +1280,7 @@ button.secondary-btn:hover {
 
 .button-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.7rem;
 }
 
@@ -2362,6 +2362,211 @@ button:hover {
   border-left-color: var(--danger);
 }
 
+.formal-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: fit-content;
+  color: var(--qms-slate);
+  font-weight: 800;
+}
+
+.formal-toggle input {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  accent-color: var(--qms-blue);
+}
+
+.formal-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: var(--surface-muted);
+}
+
+.formal-fields .formal-signature-input,
+.formal-fields button {
+  grid-column: 1 / -1;
+}
+
+.formal-signature-input {
+  min-height: 92px;
+}
+
+.letter-preview-modal {
+  width: min(920px, calc(100vw - 2rem));
+  max-height: min(92svh, 900px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 0.85rem;
+  padding: 1.1rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.28);
+}
+
+.letter-preview-close {
+  width: auto;
+}
+
+.letter-preview-scroll {
+  overflow: auto;
+  padding: 0.85rem;
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  background: #eef2f7;
+}
+
+.letter-html-source {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 760px;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.letter-preview-actions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.formal-letter-template {
+  width: min(760px, 100%);
+  min-height: 980px;
+  margin: 0 auto;
+  padding: 2rem;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #d8dee8;
+  box-shadow: 0 12px 28px rgba(33, 52, 71, 0.12);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.formal-letter-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 3px solid var(--qms-blue);
+}
+
+.formal-letter-logo {
+  width: 72px;
+  height: 72px;
+  object-fit: contain;
+}
+
+.formal-letter-header h1 {
+  margin: 0 0 0.25rem;
+  color: var(--qms-blue-dark);
+  font-size: 1.25rem;
+}
+
+.formal-letter-header p {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.9rem;
+}
+
+.formal-letter-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem 1rem;
+  margin: 1.4rem 0;
+  font-family: var(--font);
+}
+
+.formal-letter-meta div {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.formal-letter-meta strong,
+.formal-letter-subject span {
+  color: var(--qms-blue-dark);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.formal-letter-meta span,
+.formal-letter-subject strong {
+  overflow-wrap: anywhere;
+}
+
+.formal-letter-subject {
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 1.35rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid #d8dee8;
+  border-bottom: 1px solid #d8dee8;
+}
+
+.formal-letter-body {
+  min-height: 420px;
+  font-size: 1rem;
+  line-height: 1.75;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.formal-letter-signature {
+  width: min(320px, 70%);
+  margin-top: 2rem;
+}
+
+.signature-line {
+  border-top: 1px solid #1f2937;
+  margin-bottom: 0.45rem;
+}
+
+.formal-letter-signature p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.formal-letter-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #d8dee8;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.78rem;
+}
+
+.formal-letter-view {
+  overflow-x: auto;
+}
+
+.formal-letter-view .formal-letter-template {
+  min-height: auto;
+  box-shadow: none;
+}
+
+.letter-indicator {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: #fff8e6;
+  color: #8a5c00;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 @keyframes toast-in {
   from {
     opacity: 0;
@@ -2400,5 +2605,22 @@ button:hover {
 
   .mini-chart {
     overflow-x: auto;
+  }
+
+  .formal-fields,
+  .letter-preview-actions,
+  .formal-letter-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .formal-letter-template {
+    min-height: auto;
+    padding: 1rem;
+  }
+
+  .formal-letter-header,
+  .formal-letter-footer {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
