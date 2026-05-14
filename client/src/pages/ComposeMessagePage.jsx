@@ -5,6 +5,15 @@ import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
 import { LETTER_TEMPLATES, buildClientLetterPreview } from '../utils/letterPreview';
 
+const emptyLetterFields = {
+  senderNameTitle: '',
+  receiverNameTitle: '',
+  salutation: '',
+  closingText: '',
+  signatureSection: '',
+  date: new Date().toISOString().slice(0, 10)
+};
+
 export default function ComposeMessagePage() {
   const [users, setUsers] = useState([]);
   const [templateType, setTemplateType] = useState('official_letter');
@@ -22,6 +31,13 @@ export default function ComposeMessagePage() {
   const [previewOpen, setPreviewOpen] = useState(false);
   const [serverPreviewHtml, setServerPreviewHtml] = useState('');
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [isFormalLetter, setIsFormalLetter] = useState(false);
+  const [letterFields, setLetterFields] = useState(emptyLetterFields);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState('submit');
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const letterPreviewRef = useRef(null);
+  const letterSourceRef = useRef(null);
 
   useEffect(() => {
     const token = sessionStorage.getItem('token') || localStorage.getItem('token');
@@ -114,6 +130,7 @@ export default function ComposeMessagePage() {
 
     if (action === 'submit' && !validateForSubmit()) return;
 
+  const sendMessage = async (action = 'submit', letterHtml = '') => {
     setSubmitting(true);
     const formData = new FormData();
     formData.append('receiver_ids', JSON.stringify(receivers));
@@ -158,6 +175,30 @@ export default function ComposeMessagePage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleSubmit = async (e, action = 'submit') => {
+    e.preventDefault();
+    setSuccess('');
+    setError('');
+
+    if (action === 'submit' && receivers.length === 0) {
+      setError('Please select at least one receiver.');
+      return;
+    }
+
+    if (action === 'submit' && !subject.trim()) {
+      setError('Please enter a subject before sending.');
+      return;
+    }
+
+    if (isFormalLetter && action === 'submit') {
+      setPendingAction(action);
+      setPreviewOpen(true);
+      return;
+    }
+
+    await sendMessage(action);
   };
 
   return (

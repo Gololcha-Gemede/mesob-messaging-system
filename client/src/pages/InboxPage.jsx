@@ -73,6 +73,7 @@ export default function InboxPage() {
                 <span>{msg.reference_number}</span>
                 <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
                 {msg.read_at ? <span className="message-state message-state--read">Read</span> : <span className="message-state message-state--unread">Unread</span>}
+                {msg.is_formal_letter ? <span className="letter-indicator">Formal Letter</span> : null}
                 {msg.file_path ? <span className="attachment-indicator">Attachment</span> : null}
                 {msg.due_date ? <span className="priority-label">Priority</span> : null}
               </div>

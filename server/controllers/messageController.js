@@ -31,6 +31,21 @@ function parseRecipientIds(value) {
   )];
 }
 
+function parseBoolean(value) {
+  return value === true || value === 'true' || value === '1' || value === 1;
+}
+
+function cleanLetterHtml(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed
+    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
+    .replace(/\son\w+="[^"]*"/gi, '')
+    .replace(/\son\w+='[^']*'/gi, '')
+    .replace(/\sjavascript:/gi, '');
+}
+
 function canAccessMessage(user, message) {
   if (message.status === 'draft') return Number(message.sender_id) === Number(user.id);
   if (user.role === 'admin') return true;
