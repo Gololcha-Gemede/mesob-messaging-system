@@ -19,7 +19,7 @@ export default function SentPage() {
       setError('');
       axios
         .get(`/api/messages/sent${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
         })
         .then((res) => {
           if (ignore) return;

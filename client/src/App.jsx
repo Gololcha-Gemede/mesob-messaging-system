@@ -14,13 +14,14 @@ import TrackMessagePage from './pages/TrackMessagePage';
 import { roleFromToken, ADMIN_REGISTER_SESSION_KEY } from './utils/jwt';
 import { notify } from './utils/notify';
 
-function PrivateRoute({ children }) {
-	const token = localStorage.getItem('token');
-	return token ? children : <Navigate to="/login" replace />;
-}
+	function PrivateRoute({ children }) {
+		const token = sessionStorage.getItem('token');
+		return token ? children : <Navigate to="/login" replace />;
+	}
+
 
 function AdminRoute({ children }) {
-	const token = localStorage.getItem('token');
+	const token = sessionStorage.getItem('token');
 	const role = roleFromToken(token);
 	if (!token) return <Navigate to="/login" replace />;
 	if (role !== 'admin') return <Navigate to="/" replace />;
@@ -28,7 +29,7 @@ function AdminRoute({ children }) {
 }
 
 function RegisterRoute() {
-	const token = localStorage.getItem('token');
+	const token = sessionStorage.getItem('token');
 	const location = useLocation();
 	const role = roleFromToken(token);
 	const fromAdmin =
@@ -109,8 +110,9 @@ function profileImageSrc(profile) {
 	return String(path).startsWith('http') ? path : path;
 }
 
-function NavBar() {
-	const token = localStorage.getItem('token');
+	function NavBar() {
+		const token = sessionStorage.getItem('token');
+
 	const navigate = useNavigate();
 	const location = useLocation();
 	const homePath = token ? '/' : '/login';
@@ -186,7 +188,7 @@ function NavBar() {
 	}, []);
 
 	const logout = () => {
-		localStorage.removeItem('token');
+		sessionStorage.removeItem('token');
 		setProfileOpen(false);
 		setNotificationsOpen(false);
 		setPinnedMenu(null);
@@ -426,7 +428,7 @@ function NavBar() {
 }
 
 function SideBar() {
-	const token = localStorage.getItem('token');
+	const token = sessionStorage.getItem('token');
 	const isAdmin = roleFromToken(token) === 'admin';
 	const location = useLocation();
 	const [openGroups, setOpenGroups] = useState({
@@ -434,7 +436,33 @@ function SideBar() {
 		tracking: location.pathname === '/track',
 		admin: location.pathname === '/admin'
 	});
+	const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+	const [unreadInboxError, setUnreadInboxError] = useState('');
 	if (!token) return null;
+
+	useEffect(() => {
+		let ignore = false;
+		const headers = { Authorization: `Bearer ${token}` };
+		const loadUnread = async () => {
+			try {
+				const res = await axios.get('/api/search/dashboard', { headers });
+				if (ignore) return;
+				const next = Number(res?.data?.unread) || 0;
+				setUnreadInboxCount(next);
+				setUnreadInboxError('');
+			} catch (e) {
+				if (ignore) return;
+				setUnreadInboxCount(0);
+				setUnreadInboxError('Unable to load unread inbox count.');
+			}
+		};
+		loadUnread();
+		const interval = window.setInterval(loadUnread, 30000);
+		return () => {
+			ignore = true;
+			window.clearInterval(interval);
+		};
+	}, [token]);
 
 	const toggleGroup = (group) => {
 		setOpenGroups((groups) => ({ ...groups, [group]: !groups[group] }));
@@ -448,12 +476,18 @@ function SideBar() {
 					<span><Icon name="inbox" />Messages</span>
 					<Icon name="chevron" />
 				</button>
-				<div className="side-nav-submenu">
-					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/inbox"><Icon name="inbox" />Inbox</NavLink>
-					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/sent"><Icon name="sent" />Sent</NavLink>
-					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/drafts"><Icon name="drafts" />Drafts</NavLink>
-					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/compose"><Icon name="compose" />Compose</NavLink>
-				</div>
+					<div className="side-nav-submenu">
+						<NavLink
+							className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`}
+							to="/inbox"
+						>
+							<Icon name="inbox" />Inbox
+							{unreadInboxCount > 0 ? <span className="inbox-unread-badge">{unreadInboxCount}</span> : null}
+						</NavLink>
+						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/sent"><Icon name="sent" />Sent</NavLink>
+						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/drafts"><Icon name="drafts" />Drafts</NavLink>
+						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/compose"><Icon name="compose" />Compose</NavLink>
+					</div>
 			</div>
 			<div className={`side-nav-group${openGroups.tracking ? ' side-nav-group--open' : ''}`}>
 				<button type="button" className="side-nav-link side-nav-group-trigger" onClick={() => toggleGroup('tracking')} aria-expanded={openGroups.tracking}>

@@ -21,7 +21,9 @@ exports.login = async (req, res) => {
       name: user.name,
       role: user.role,
       department_id: user.department_id,
-      profile_image_path: user.profile_image_path
+      profile_image_path: user.profile_image_path,
+      position_title: user.position_title,
+      signature_image_path: user.signature_image_path
     }
   });
 };
@@ -36,7 +38,9 @@ exports.me = async (req, res) => {
       email: user.email,
       role: user.role,
       department_id: user.department_id,
-      profile_image_path: user.profile_image_path
+      profile_image_path: user.profile_image_path,
+      position_title: user.position_title,
+      signature_image_path: user.signature_image_path
     });
   } catch (err) {
     res.status(500).json({ message: 'Error fetching profile', error: err.message });
@@ -51,6 +55,7 @@ exports.updateMe = async (req, res) => {
     const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
     const email = typeof req.body.email === 'string' ? req.body.email.trim() : '';
     const password = typeof req.body.password === 'string' ? req.body.password.trim() : '';
+    const position_title = typeof req.body.position_title === 'string' ? req.body.position_title.trim() : undefined;
     if (!name || !email) {
       return res.status(400).json({ message: 'Name and email are required' });
     }
@@ -65,6 +70,7 @@ exports.updateMe = async (req, res) => {
       department_id: user.department_id
     };
     if (password) payload.password = await bcrypt.hash(password, 10);
+    if (position_title !== undefined) payload.position_title = position_title;
     const profileImagePath = uploadedProfilePath(req.file);
     if (profileImagePath !== undefined) payload.profile_image_path = profileImagePath;
     await userModel.update(req.user.id, payload);
@@ -75,7 +81,9 @@ exports.updateMe = async (req, res) => {
       email,
       role: user.role,
       department_id: user.department_id,
-      profile_image_path: payload.profile_image_path ?? user.profile_image_path
+      profile_image_path: payload.profile_image_path ?? user.profile_image_path,
+      position_title: payload.position_title ?? user.position_title,
+      signature_image_path: payload.signature_image_path ?? user.signature_image_path
     });
   } catch (err) {
     res.status(500).json({ message: 'Error updating profile', error: err.message });

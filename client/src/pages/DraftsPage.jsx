@@ -27,7 +27,7 @@ export default function DraftsPage() {
       setError('');
       axios
         .get(`/api/messages/drafts${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}` }
         })
         .then((res) => {
           if (ignore) return;
@@ -63,7 +63,7 @@ export default function DraftsPage() {
     setError('');
     try {
       await axios.delete('/api/messages/drafts', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}` },
         data: { ids }
       });
       setMessages((items) => items.filter((msg) => !ids.includes(msg.id)));

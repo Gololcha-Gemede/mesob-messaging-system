@@ -27,7 +27,8 @@ export default function DashboardPage() {
     recent_activity: []
   });
   const [error, setError] = useState('');
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
+
   const isAdmin = roleFromToken(token) === 'admin';
   const maxWeekly = Math.max(1, ...((counts.weekly_stats || []).map((item) => Number(item.count) || 0)));
 

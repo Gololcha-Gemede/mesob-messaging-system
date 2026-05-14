@@ -7,6 +7,7 @@ node_modules
 # build folders
 dist
 build
+server/generated-pdfs
 
 # logs
 *.log

@@ -7,27 +7,44 @@ module.exports = {
       receiver_id,
       subject,
       content,
+      raw_content = content || '',
+      formatted_content = '',
+      template_type = 'official_letter',
       reference_number,
       status,
       file_path,
+      file_name = null,
+      file_mime = null,
+      file_size = null,
+      pdf_path = null,
       department_id,
       due_date = null
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, due_date, submitted_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+        sender_id, receiver_id, subject, content, raw_content, formatted_content, template_type,
+        reference_number, status, file_path, file_name, file_mime, file_size, pdf_path,
+        department_id, due_date, submitted_at, delivered_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         sender_id,
         receiver_id,
         subject,
-        content,
+        raw_content,
+        raw_content,
+        formatted_content,
+        template_type,
         reference_number,
         status,
         file_path,
+        file_name,
+        file_mime,
+        file_size,
+        pdf_path,
         department_id,
         due_date,
-        status === 'submitted' ? new Date() : null
+        status !== 'draft' ? new Date() : null,
+        status !== 'draft' ? new Date() : null
       ]
     );
     return result.insertId;
@@ -238,8 +255,9 @@ module.exports = {
   async markAsRead(id, userId) {
     const [result] = await pool.query(
       `UPDATE messages
-       SET read_at = NOW(),
-           status = CASE WHEN status = 'submitted' THEN 'received' ELSE status END
+       SET read_at = COALESCE(read_at, NOW()),
+           opened_at = COALESCE(opened_at, NOW()),
+           status = CASE WHEN status IN ('submitted', 'sent', 'delivered', 'received') THEN 'opened' ELSE status END
        WHERE id = ? AND receiver_id = ? AND read_at IS NULL`,
       [id, userId]
     );
@@ -252,18 +270,76 @@ module.exports = {
     const msg = original[0];
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, subject, content, reference_number, status, file_path, department_id, parent_message_id, due_date, submitted_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [actor_id, new_receiver_id, msg.subject, msg.content, reference_number, 'submitted', msg.file_path, msg.department_id, msg.id, due_date]
+        sender_id, receiver_id, subject, content, raw_content, formatted_content, template_type,
+        reference_number, status, file_path, file_name, file_mime, file_size, pdf_path,
+        department_id, parent_message_id, due_date, submitted_at, delivered_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
+      [
+        actor_id,
+        new_receiver_id,
+        msg.subject,
+        msg.raw_content || msg.content || '',
+        msg.raw_content || msg.content || '',
+        msg.formatted_content || '',
+        msg.template_type || 'official_letter',
+        reference_number,
+        'delivered',
+        msg.file_path,
+        msg.file_name,
+        msg.file_mime,
+        msg.file_size,
+        msg.pdf_path,
+        msg.department_id,
+        msg.id,
+        due_date
+      ]
     );
     return result.insertId;
   },
-  async submit(id, senderId) {
+  async submit(id, senderId, updates = {}) {
     const [result] = await pool.query(
       `UPDATE messages
-       SET status = 'submitted', submitted_at = NOW()
+       SET status = 'delivered',
+           submitted_at = NOW(),
+           delivered_at = NOW(),
+           formatted_content = COALESCE(?, formatted_content),
+           pdf_path = COALESCE(?, pdf_path)
        WHERE id = ? AND sender_id = ? AND status = 'draft'`,
-      [id, senderId]
+      [updates.formatted_content || null, updates.pdf_path || null, id, senderId]
+    );
+    return result.affectedRows;
+  },
+  async updateGeneratedFields(id, { formatted_content, pdf_path }) {
+    const fields = [];
+    const params = [];
+    if (formatted_content !== undefined) {
+      fields.push('formatted_content = ?');
+      params.push(formatted_content);
+    }
+    if (pdf_path !== undefined) {
+      fields.push('pdf_path = ?');
+      params.push(pdf_path);
+    }
+    if (!fields.length) return 0;
+    params.push(id);
+    const [result] = await pool.query(`UPDATE messages SET ${fields.join(', ')} WHERE id = ?`, params);
+    return result.affectedRows;
+  },
+  async markPrinted(id, userId) {
+    const [result] = await pool.query(
+      `UPDATE messages
+       SET printed_at = COALESCE(printed_at, NOW())
+       WHERE id = ? AND (sender_id = ? OR receiver_id = ?)`,
+      [id, userId, userId]
+    );
+    return result.affectedRows;
+  },
+  async markPdfDownloaded(id, userId) {
+    const [result] = await pool.query(
+      `UPDATE messages
+       SET downloaded_at = COALESCE(downloaded_at, NOW())
+       WHERE id = ? AND (sender_id = ? OR receiver_id = ?)`,
+      [id, userId, userId]
     );
     return result.affectedRows;
   },
