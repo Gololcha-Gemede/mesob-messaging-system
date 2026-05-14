@@ -1,8 +1,9 @@
-import { useRef, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import axios from 'axios';
 import RecipientPicker from '../components/RecipientPicker';
-import FormalLetterTemplate from '../components/FormalLetterTemplate';
+import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
+import { LETTER_TEMPLATES, buildClientLetterPreview } from '../utils/letterPreview';
 
 const emptyLetterFields = {
   senderNameTitle: '',
@@ -15,14 +16,20 @@ const emptyLetterFields = {
 
 export default function ComposeMessagePage() {
   const [users, setUsers] = useState([]);
+  const [templateType, setTemplateType] = useState('official_letter');
   const [subject, setSubject] = useState('');
   const [content, setContent] = useState('');
+  const [sendName, setSendName] = useState('');
   const [receivers, setReceivers] = useState([]);
+
   const [file, setFile] = useState(null);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [loadingRecipients, setLoadingRecipients] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [serverPreviewHtml, setServerPreviewHtml] = useState('');
   const [fileInputKey, setFileInputKey] = useState(0);
   const [isFormalLetter, setIsFormalLetter] = useState(false);
   const [letterFields, setLetterFields] = useState(emptyLetterFields);
@@ -33,12 +40,10 @@ export default function ComposeMessagePage() {
   const letterSourceRef = useRef(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
+    const token = sessionStorage.getItem('token') || localStorage.getItem('token');
     const headers = { Authorization: `Bearer ${token}` };
 
-    axios.get('/api/users/recipients', {
-      headers
-    })
+    axios.get('/api/users/recipients', { headers })
       .then((res) => {
         setUsers(Array.isArray(res.data) ? res.data : []);
         setError('');
@@ -52,47 +57,78 @@ export default function ComposeMessagePage() {
       });
   }, []);
 
-  const updateLetterField = (field, value) => {
-    setLetterFields((fields) => ({ ...fields, [field]: value }));
-  };
+  const firstRecipientName = useMemo(() => {
+    const selected = users.find((user) => Number(user.id) === Number(receivers[0]));
+    if (receivers.length > 1) return `${selected?.name || 'Recipient'} + ${receivers.length - 1}`;
+    return selected?.name || 'Recipient';
+  }, [receivers, users]);
 
-  const buildLetterHtml = () => (
-    isFormalLetter && letterSourceRef.current ? letterSourceRef.current.outerHTML : ''
-  );
-
-  const downloadLetterPdf = async () => {
-    if (!letterPreviewRef.current) return;
-    setDownloadingPdf(true);
-    try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf()
-        .set({
-          margin: 0.35,
-          filename: `${(subject || 'formal-letter').replace(/[^\w-]+/g, '-').replace(/^-|-$/g, '') || 'formal-letter'}.pdf`,
-          image: { type: 'jpeg', quality: 0.98 },
-          html2canvas: { scale: 2, useCORS: true },
-          jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-        })
-        .from(letterPreviewRef.current)
-        .save();
-    } catch {
-      setError('Unable to download the formal letter PDF.');
-    } finally {
-      setDownloadingPdf(false);
-    }
-  };
+  const livePreviewHtml = useMemo(() => buildClientLetterPreview({
+    templateType,
+    recipientName: firstRecipientName,
+    subject,
+    content,
+    file
+  }), [content, file, firstRecipientName, subject, templateType]);
 
   const resetForm = () => {
     setSubject('');
     setContent('');
     setReceivers([]);
     setFile(null);
-    setFileInputKey((key) => key + 1);
-    setIsFormalLetter(false);
-    setLetterFields(emptyLetterFields);
+    setServerPreviewHtml('');
     setPreviewOpen(false);
-    setPendingAction('submit');
+    setFileInputKey((key) => key + 1);
   };
+
+  const validateForSubmit = () => {
+    if (receivers.length === 0) {
+      setError('Please select at least one receiver.');
+      return false;
+    }
+    if (!subject.trim()) {
+      setError('Please enter a subject before sending.');
+      return false;
+    }
+    return true;
+  };
+
+  const requestPreview = async () => {
+    setSuccess('');
+    setError('');
+    if (!validateForSubmit()) return;
+
+    setPreviewing(true);
+    try {
+      const res = await axios.post('/api/messages/preview', {
+        receiver_ids: receivers,
+        receiver_id: receivers[0] || '',
+        subject,
+        content,
+        template_type: templateType,
+        sender_name: sendName,
+        attachment_name: file?.name || '',
+        attachment_mime: file?.type || '',
+        attachment_size: file?.size || 0
+      }, {
+        headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}` }
+      });
+      setServerPreviewHtml(res.data?.formatted_content || livePreviewHtml);
+      setPreviewOpen(true);
+    } catch (err) {
+      const apiMessage = err?.response?.data?.message;
+      setError(apiMessage || 'Unable to generate letter preview.');
+      notify({ type: 'error', title: 'System alert', message: apiMessage || 'Preview could not be generated.' });
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleSubmit = async (action = 'submit') => {
+    setSuccess('');
+    setError('');
+
+    if (action === 'submit' && !validateForSubmit()) return;
 
   const sendMessage = async (action = 'submit', letterHtml = '') => {
     setSubmitting(true);
@@ -101,28 +137,37 @@ export default function ComposeMessagePage() {
     formData.append('receiver_id', receivers[0] || '');
     formData.append('subject', subject);
     formData.append('content', content);
+    formData.append('template_type', templateType);
+    formData.append('sender_name', sendName);
     formData.append('action', action);
-    formData.append('is_formal_letter', isFormalLetter ? '1' : '0');
-    if (isFormalLetter) {
-      formData.append('letter_html', letterHtml || buildLetterHtml());
-      formData.append('pdf_path', '');
-    }
+
+
+    try {
+      const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+      if (token) {
+        const b64 = token.split('.')[1];
+        const json = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+        const payload = JSON.parse(json);
+        if (payload?.department_id) formData.append('department_id', payload.department_id);
+      }
+    } catch {}
+
+
     if (file) formData.append('file', file);
     try {
       await axios.post('/api/messages', formData, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem('token')}`,
+          Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}`,
           'Content-Type': 'multipart/form-data',
         },
       });
-      setSuccess(action === 'draft' ? 'Draft saved.' : 'Message submitted.');
+      setSuccess(action === 'draft' ? 'Draft saved.' : 'Official letter sent.');
       notify({
         type: 'success',
         title: action === 'draft' ? 'Draft Saved notification' : 'Message Sent confirmation',
-        message: action === 'draft' ? 'Your message draft was saved.' : 'Your message was sent successfully.'
+        message: action === 'draft' ? 'Your message draft was saved.' : 'Your formatted letter was sent successfully.'
       });
       resetForm();
-      setPreviewOpen(false);
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
       setError(apiMessage || (action === 'draft' ? 'Failed to save draft.' : 'Failed to send message.'));
@@ -157,110 +202,119 @@ export default function ComposeMessagePage() {
   };
 
   return (
-    <div className="compose-container">
-      <h2>Compose Message</h2>
-      <form onSubmit={(e) => handleSubmit(e, 'submit')}>
-        {loadingRecipients ? <div className="list-state">Loading recipients...</div> : null}
-        <RecipientPicker users={users} selectedIds={receivers} onChange={setReceivers} />
-        <input type="text" placeholder="Subject" value={subject} onChange={e => setSubject(e.target.value)} required />
-        <textarea placeholder="Content" value={content} onChange={e => setContent(e.target.value)} />
-        <label className="formal-toggle">
-          <input
-            type="checkbox"
-            checked={isFormalLetter}
-            onChange={(e) => setIsFormalLetter(e.target.checked)}
-          />
-          <span>Convert to Formal Letter</span>
-        </label>
-        {isFormalLetter ? (
-          <div className="formal-fields">
-            <input type="text" placeholder="Sender name/title" value={letterFields.senderNameTitle} onChange={(e) => updateLetterField('senderNameTitle', e.target.value)} />
-            <input type="text" placeholder="Receiver name/title" value={letterFields.receiverNameTitle} onChange={(e) => updateLetterField('receiverNameTitle', e.target.value)} />
-            <input type="text" placeholder="Salutation" value={letterFields.salutation} onChange={(e) => updateLetterField('salutation', e.target.value)} />
-            <input type="text" placeholder="Closing text" value={letterFields.closingText} onChange={(e) => updateLetterField('closingText', e.target.value)} />
-            <textarea className="formal-signature-input" placeholder="Signature section" value={letterFields.signatureSection} onChange={(e) => updateLetterField('signatureSection', e.target.value)} />
-            <input type="date" value={letterFields.date} onChange={(e) => updateLetterField('date', e.target.value)} />
-            <button type="button" className="secondary-btn" onClick={() => setPreviewOpen(true)}>
-              Preview Formal Letter
+    <div className="compose-container compose-container--document">
+      <div className="page-title-row">
+        <div>
+          <h2>Compose Message</h2>
+          <p className="admin-panel-hint">Official internal correspondence</p>
+        </div>
+        <span className="autosave-indicator">Document mode</span>
+      </div>
+
+      <div className="compose-document-layout">
+        <form className="compose-document-form" onSubmit={(e) => {
+          e.preventDefault();
+          requestPreview();
+        }}>
+          {loadingRecipients ? <div className="list-state">Loading recipients...</div> : null}
+
+          <label className="compose-field">
+            <span>Template</span>
+            <select value={templateType} onChange={(e) => setTemplateType(e.target.value)}>
+              {LETTER_TEMPLATES.map((template) => (
+                <option key={template.value} value={template.value}>{template.label}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="compose-field">
+            <span>Recipients</span>
+            <RecipientPicker users={users} selectedIds={receivers} onChange={setReceivers} />
+          </label>
+
+          <label className="compose-field">
+            <span>Subject</span>
+            <input type="text" placeholder="Subject" value={subject} onChange={(e) => setSubject(e.target.value)} required />
+          </label>
+
+          <label className="compose-field">
+            <span>Send as name (optional)</span>
+            <input
+              type="text"
+              placeholder="Type the sender display name"
+              value={sendName}
+              onChange={(e) => setSendName(e.target.value)}
+            />
+          </label>
+
+          <label className="compose-field">
+            <span>Normal text (optional)</span>
+            <textarea placeholder="Write normal text here (will be sent as message content)" value={content} onChange={(e) => setContent(e.target.value)} />
+          </label>
+
+          <div className="compose-hint">Tip: Choose a template above to format your message. If you select template “Official Letter”, your normal text will be inserted into the letter body.</div>
+
+
+
+
+
+          <label className="compose-file-drop">
+            <span>Attachment</span>
+            <input key={fileInputKey} type="file" onChange={(e) => setFile(e.target.files[0] || null)} />
+          </label>
+
+          {file ? (
+            <div className="attachment-preview">
+              <span>{file.name}</span>
+              <button
+                type="button"
+                className="attachment-remove"
+                onClick={() => {
+                  setFile(null);
+                  setFileInputKey((key) => key + 1);
+                }}
+                aria-label="Remove attachment"
+              >
+                x
+              </button>
+            </div>
+          ) : null}
+
+          <div className="button-row compose-action-row">
+            <button type="submit" disabled={submitting || previewing || loadingRecipients}>
+              {previewing ? 'Preparing Preview...' : 'Preview Letter'}
+            </button>
+            <button type="button" className="secondary-btn" onClick={() => handleSubmit('draft')} disabled={submitting || previewing}>
+              {submitting ? 'Saving...' : 'Save Draft'}
             </button>
           </div>
-        ) : null}
-        <input key={fileInputKey} type="file" onChange={e => setFile(e.target.files[0] || null)} />
-        {file ? (
-          <div className="attachment-preview">
-            <span>{file.name}</span>
-            <button
-              type="button"
-              className="attachment-remove"
-              onClick={() => {
-                setFile(null);
-                setFileInputKey((key) => key + 1);
-              }}
-              aria-label="Remove attachment"
-            >
-              x
-            </button>
+          {success && <div className="success">{success}</div>}
+          {error && <div className="error">{error}</div>}
+        </form>
+
+        <aside className="compose-preview-pane" aria-label="Live letter preview">
+          <div className="panel-title-row">
+            <h3>Live Preview</h3>
+            <span className="status-pill status-delivered">{LETTER_TEMPLATES.find((item) => item.value === templateType)?.label}</span>
           </div>
-        ) : null}
-        <div className="button-row">
-          <button type="submit" disabled={submitting || loadingRecipients}>
-            {submitting ? 'Submitting...' : 'Submit'}
-          </button>
-          <button type="button" className="secondary-btn" onClick={(e) => handleSubmit(e, 'draft')} disabled={submitting}>
-            {submitting ? 'Saving...' : 'Save Draft'}
-          </button>
-          <button type="button" className="secondary-btn" onClick={resetForm} disabled={submitting}>
-            Cancel
-          </button>
-        </div>
-        {success && <div className="success">{success}</div>}
-        {error && <div className="error">{error}</div>}
-      </form>
-      {isFormalLetter ? (
-        <div className="letter-html-source" aria-hidden="true">
-          <FormalLetterTemplate
-            ref={letterSourceRef}
-            subject={subject}
-            body={content}
-            referenceNumber="__SYSTEM_REFERENCE_NUMBER__"
-            senderNameTitle={letterFields.senderNameTitle}
-            receiverNameTitle={letterFields.receiverNameTitle}
-            salutation={letterFields.salutation}
-            closingText={letterFields.closingText}
-            signatureSection={letterFields.signatureSection}
-            date={letterFields.date}
-          />
-        </div>
-      ) : null}
+          <LetterRenderer html={livePreviewHtml} />
+        </aside>
+      </div>
+
       {previewOpen ? (
-        <div className="modal-backdrop">
-          <div className="letter-preview-modal">
+        <div className="modal-backdrop letter-preview-backdrop">
+          <div className="letter-preview-modal" role="dialog" aria-modal="true" aria-labelledby="letter-preview-title">
             <div className="panel-title-row">
-              <h3>Formal Letter Preview</h3>
-              <button type="button" className="secondary-btn letter-preview-close" onClick={() => setPreviewOpen(false)}>Edit</button>
+              <h3 id="letter-preview-title">Preview Letter</h3>
+              <button type="button" className="secondary-btn letter-modal-close" onClick={() => setPreviewOpen(false)}>Edit</button>
             </div>
             <div className="letter-preview-scroll">
-              <FormalLetterTemplate
-                ref={letterPreviewRef}
-                subject={subject}
-                body={content}
-                referenceNumber=""
-                senderNameTitle={letterFields.senderNameTitle}
-                receiverNameTitle={letterFields.receiverNameTitle}
-                salutation={letterFields.salutation}
-                closingText={letterFields.closingText}
-                signatureSection={letterFields.signatureSection}
-                date={letterFields.date}
-              />
+              <LetterRenderer html={serverPreviewHtml || livePreviewHtml} />
             </div>
-            <div className="letter-preview-actions">
-              <button type="button" className="secondary-btn" onClick={() => setPreviewOpen(false)}>Edit</button>
-              <button type="button" className="secondary-btn" onClick={resetForm} disabled={submitting}>Cancel</button>
-              <button type="button" className="secondary-btn" onClick={downloadLetterPdf} disabled={downloadingPdf}>
-                {downloadingPdf ? 'Preparing PDF...' : 'Download PDF'}
-              </button>
-              <button type="button" onClick={() => sendMessage(pendingAction, buildLetterHtml())} disabled={submitting}>
-                {submitting ? 'Sending...' : 'Confirm & Send'}
+            <div className="confirm-modal-actions letter-modal-actions">
+              <button type="button" className="secondary-btn" onClick={() => setPreviewOpen(false)}>Return to Compose</button>
+              <button type="button" onClick={() => handleSubmit('submit')} disabled={submitting}>
+                {submitting ? 'Sending...' : 'Confirm Send'}
               </button>
             </div>
           </div>

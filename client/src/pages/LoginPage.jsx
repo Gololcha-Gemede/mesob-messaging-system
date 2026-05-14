@@ -1,34 +1,85 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import AuthPageLayout, { AuthInputRow } from '../components/AuthPageLayout';
+
+function isCapsLockOn(e) {
+  // e.getModifierState works in modern browsers; fallback to false.
+  return Boolean(e?.getModifierState && e.getModifierState('CapsLock'));
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [capsLockOn, setCapsLockOn] = useState(false);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
+  const [submitting, setSubmitting] = useState(false);
+  const [shake, setShake] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await axios.post('/api/auth/login', { email, password });
-      localStorage.setItem('token', res.data.token);
-      navigate('/');
-    } catch {
-      setError('Invalid credentials');
+  const navigate = useNavigate();
+  const emailRef = useRef(null);
+
+  useEffect(() => {
+    emailRef.current?.focus?.();
+  }, []);
+
+  useEffect(() => {
+
+    if (!error) return;
+    // keep focus on the email field so the user can fix input quickly
+    emailRef.current?.focus?.();
+  }, [error]);
+
+  useEffect(() => {
+    if (!shake) return;
+    const t = window.setTimeout(() => setShake(false), 520);
+    return () => window.clearTimeout(t);
+  }, [shake]);
+
+  const storeToken = (token) => {
+    if (rememberMe) {
+      localStorage.setItem('token', token);
+      sessionStorage.removeItem('token');
+    } else {
+      sessionStorage.setItem('token', token);
+      localStorage.removeItem('token');
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (submitting) return;
+
+    setSubmitting(true);
+    setError('');
+    try {
+      const res = await axios.post('/api/auth/login', { email, password });
+      storeToken(res.data.token);
+      navigate('/');
+    } catch (err) {
+      const serverMessage = err?.response?.data?.message;
+      setError(serverMessage || 'Invalid credentials');
+      setShake(true);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+  const passwordFeedback = useMemo(() => {
+    if (!password) return '';
+    if (password.length < 8) return 'Password should be at least 8 characters.';
+    return '';
+  }, [password]);
+
   return (
-    <AuthPageLayout
-      title="Sign in"
-      subtitle="Internal Message Management System"
-    >
-      <form className="auth-form" onSubmit={handleSubmit}>
+    <AuthPageLayout title="Sign in" subtitle="Internal Message Management System">
+      <form className={`auth-form ${shake ? 'auth-form--shake' : ''}`} onSubmit={handleSubmit}>
         <AuthInputRow icon="email">
           <input
+            ref={emailRef}
             className="auth-field"
             type="email"
             placeholder="Email"
@@ -36,8 +87,10 @@ export default function LoginPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            aria-label="Email"
           />
         </AuthInputRow>
+
         <AuthInputRow icon="lock">
           <div className="auth-password-wrap">
             <input
@@ -47,7 +100,9 @@ export default function LoginPage() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onKeyUp={(e) => setCapsLockOn(isCapsLockOn(e))}
               required
+              aria-label="Password"
             />
             <button
               type="button"
@@ -63,11 +118,53 @@ export default function LoginPage() {
             </button>
           </div>
         </AuthInputRow>
-        <button type="submit" className="auth-submit">
-          Login
+
+        <div className="auth-subrow">
+          <label className="auth-remember">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+            />
+            <span>Remember me</span>
+          </label>
+
+          <button
+            type="button"
+            className="auth-link"
+            onClick={() => {
+              setError('Forgot password is not available yet.');
+              setShake(true);
+            }}
+          >
+            Forgot password?
+          </button>
+        </div>
+
+
+        {capsLockOn ? (
+          <div className="auth-caps" role="status" aria-live="polite">
+            Caps Lock is ON
+          </div>
+        ) : null}
+        {passwordFeedback ? <div className="auth-hint">{passwordFeedback}</div> : null}
+
+
+        <button type="submit" className="auth-submit" disabled={submitting}>
+          {submitting ? (
+            <span className="auth-submit-spinner" aria-hidden />
+          ) : null}
+          {submitting ? 'Signing in...' : 'Sign in'}
         </button>
-        {error ? <div className="auth-error">{error}</div> : null}
+
+        {error ? (
+          <div className="auth-error" role="alert">
+            {error}
+          </div>
+        ) : null}
+
       </form>
     </AuthPageLayout>
   );
 }
+

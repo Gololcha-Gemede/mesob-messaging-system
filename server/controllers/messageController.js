@@ -1,31 +1,10 @@
 const messageModel = require('../models/message');
 const messageEventModel = require('../models/messageEvent');
-const departmentModel = require('../models/department');
+const userModel = require('../models/user');
 const pool = require('../models/db');
-
-function padNumber(num, size) {
-  let s = num+'';
-  while (s.length < size) s = '0' + s;
-  return s;
-}
-
-async function generateReferenceNumber(department_id) {
-  const departments = await departmentModel.getAll();
-  const year = new Date().getFullYear();
-  const deptId = Number(department_id);
-  const deptName = departments.find((d) => d.id === deptId)?.name?.substring(0, 3).toUpperCase() || 'GEN';
-  const prefix = `${deptName}-${year}-`;
-  const [rows] = await pool.query(
-    `SELECT reference_number
-     FROM messages
-     WHERE department_id = ? AND reference_number LIKE ?
-     ORDER BY reference_number DESC
-     LIMIT 1`,
-    [department_id, `${prefix}%`]
-  );
-  const lastNumber = Number(String(rows[0]?.reference_number || '').split('-').pop());
-  return `${prefix}${padNumber((Number.isInteger(lastNumber) ? lastNumber : 0) + 1, 4)}`;
-}
+const { generateLetterHtml, getTemplateOptions, normalizeTemplateType } = require('../services/letterFormatter');
+const { withLockedReference } = require('../services/referenceService');
+const { generateLetterPdf } = require('../services/pdfService');
 
 async function getUserDepartmentId(userId) {
   const [[row]] = await pool.query('SELECT department_id FROM users WHERE id = ?', [userId]);
@@ -73,38 +52,99 @@ function canAccessMessage(user, message) {
   return Number(message.sender_id) === Number(user.id) || Number(message.receiver_id) === Number(user.id);
 }
 
-async function createMessageWithReference(payload, departmentId, maxAttempts = 5) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const reference_number = await generateReferenceNumber(departmentId);
-    try {
-      const letter_html = typeof payload.letter_html === 'string'
-        ? payload.letter_html.replace(/__SYSTEM_REFERENCE_NUMBER__/g, reference_number)
-        : payload.letter_html;
-      const messageId = await messageModel.create({ ...payload, letter_html, reference_number });
-      return { messageId, reference_number };
-    } catch (err) {
-      if (err.code !== 'ER_DUP_ENTRY' || attempt === maxAttempts - 1) throw err;
-    }
-  }
-  throw new Error('Unable to generate a unique reference number');
+function fileMetadata(file) {
+  if (!file) return {};
+  return {
+    file_path: file.path,
+    file_name: file.originalname || file.filename || null,
+    file_mime: file.mimetype || null,
+    file_size: file.size || null
+  };
 }
 
-async function forwardMessageWithReference(payload, departmentId, maxAttempts = 5) {
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const reference_number = await generateReferenceNumber(departmentId);
-    try {
-      const messageId = await messageModel.forward({ ...payload, reference_number });
-      return { messageId, reference_number };
-    } catch (err) {
-      if (err.code !== 'ER_DUP_ENTRY' || attempt === maxAttempts - 1) throw err;
-    }
-  }
-  throw new Error('Unable to generate a unique reference number');
+function messageAttachmentMetadata(message) {
+  if (!message?.file_path && !message?.file_name) return [];
+  return [{
+    name: message.file_name || String(message.file_path).split(/[\\/]/).pop(),
+    mime: message.file_mime || '',
+    size: message.file_size || 0
+  }];
+}
+
+function uploadAttachmentMetadata(file) {
+  if (!file) return [];
+  return [{
+    name: file.originalname || file.filename,
+    mime: file.mimetype || '',
+    size: file.size || 0
+  }];
+}
+
+function previewAttachmentMetadata(body) {
+  if (!body?.attachment_name) return [];
+  return [{
+    name: body.attachment_name,
+    mime: body.attachment_mime || '',
+    size: Number(body.attachment_size) || 0
+  }];
+}
+
+function signaturePath(user) {
+  return user?.signature_image_path || user?.profile_image_path || '';
+}
+
+function buildLetterPayload({
+  template_type,
+  reference_number,
+  sender,
+  receiver,
+  subject,
+  content,
+  attachments,
+  date = new Date()
+}) {
+  return {
+    templateType: normalizeTemplateType(template_type),
+    referenceNumber: reference_number,
+    date,
+    senderName: sender?.name || 'Sender',
+    senderTitle: sender?.position_title || '',
+    recipientName: receiver?.name || 'Recipient',
+    subject: subject || '(No subject)',
+    body: content || '',
+    attachments,
+    signatureImagePath: signaturePath(sender),
+    logoUrl: '/qms-logo.png'
+  };
+}
+
+async function createGeneratedMessage(payload, { sender, receiver, attachments, shouldGeneratePdf }) {
+  return withLockedReference(async (reference_number) => {
+    const letterPayload = buildLetterPayload({
+      template_type: payload.template_type,
+      reference_number,
+      sender,
+      receiver,
+      subject: payload.subject,
+      content: payload.raw_content || payload.content,
+      attachments
+    });
+    const formatted_content = generateLetterHtml(letterPayload);
+    const pdf_path = shouldGeneratePdf ? await generateLetterPdf(letterPayload) : null;
+    const messageId = await messageModel.create({
+      ...payload,
+      content: payload.raw_content || payload.content || '',
+      formatted_content,
+      reference_number,
+      pdf_path
+    });
+    return { messageId, reference_number, formatted_content, pdf_path };
+  });
 }
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, is_formal_letter, letter_html, pdf_path } = req.body;
+    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, template_type, sender_name } = req.body;
     const sender_id = req.user.id;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
     const effectiveDepartmentId = req.user.department_id || department_id || await getUserDepartmentId(sender_id);
@@ -122,33 +162,51 @@ exports.sendMessage = async (req, res) => {
       return res.status(400).json({ message: 'Subject is required to send a message' });
     }
 
-    const status = normalizedAction === 'draft' ? 'draft' : 'submitted';
-    const file_path = req.file ? req.file.path : null;
-    const formalLetterEnabled = parseBoolean(is_formal_letter);
-    const sanitizedLetterHtml = formalLetterEnabled ? cleanLetterHtml(letter_html) : null;
+    const status = normalizedAction === 'draft' ? 'draft' : 'delivered';
+    const sender = await userModel.findById(sender_id);
+    const attachmentFields = fileMetadata(req.file);
+    // Note: actual file metadata is stored on the message (file_path/file_name/etc.)
+    // but attachments are not rendered inside the letter HTML.
+    const attachments = uploadAttachmentMetadata(req.file);
+
     const receiversToCreate = selectedReceiverIds.length ? selectedReceiverIds : [null];
     const createdMessages = [];
 
     for (const receiverId of receiversToCreate) {
-      const { messageId, reference_number } = await createMessageWithReference({
+      const receiver = receiverId ? await userModel.findById(receiverId) : null;
+      const { messageId, reference_number } = await createGeneratedMessage({
         sender_id,
         receiver_id: receiverId,
         subject: normalizedAction === 'submit' ? subjectTrimmed : (subject || ''),
+        raw_content: content || '',
         content: content || '',
+        template_type: normalizeTemplateType(template_type),
+        sender_name,
         status,
-        file_path,
+
+        ...attachmentFields,
         department_id: effectiveDepartmentId,
-        due_date: due_date || null,
-        is_formal_letter: formalLetterEnabled ? 1 : 0,
-        letter_html: sanitizedLetterHtml,
-        pdf_path: formalLetterEnabled && typeof pdf_path === 'string' && pdf_path.trim() ? pdf_path.trim() : null
-      }, effectiveDepartmentId);
+        due_date: due_date || null
+      }, {
+        sender,
+        receiver,
+        attachments: [],
+        shouldGeneratePdf: normalizedAction === 'submit'
+      });
       await messageEventModel.create({
         message_id: messageId,
-        event_type: normalizedAction === 'draft' ? 'created_draft' : 'submitted',
+        event_type: normalizedAction === 'draft' ? 'created_draft' : 'sent',
         actor_id: sender_id,
         to_status: status
       });
+      if (normalizedAction === 'submit') {
+        await messageEventModel.create({
+          message_id: messageId,
+          event_type: 'delivered',
+          actor_id: sender_id,
+          to_status: 'delivered'
+        });
+      }
       createdMessages.push({ id: messageId, reference_number, receiver_id: receiverId });
     }
 
@@ -159,6 +217,40 @@ exports.sendMessage = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Error sending message', error: err.message });
+  }
+};
+
+exports.previewMessage = async (req, res) => {
+  try {
+    const { receiver_id, receiver_ids, subject, content, template_type, sender_name } = req.body;
+    const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
+    const sender = await userModel.findById(req.user.id);
+
+    const receiver = selectedReceiverIds[0] ? await userModel.findById(selectedReceiverIds[0]) : null;
+    const reference_number = `IMS-${new Date().getFullYear()}-PREVIEW`;
+    const letterPayload = buildLetterPayload({
+      template_type,
+      reference_number,
+      sender: {
+        ...sender,
+        name: typeof sender_name === 'string' && sender_name.trim() ? sender_name.trim() : sender?.name
+      },
+      receiver,
+      subject: subject || '(No subject)',
+      content: content || '',
+      // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
+      attachments: []
+    });
+
+    res.json({
+
+      formatted_content: generateLetterHtml(letterPayload),
+      reference_number,
+      template_type: normalizeTemplateType(template_type),
+      template_options: getTemplateOptions()
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error generating preview', error: err.message });
   }
 };
 
@@ -257,12 +349,12 @@ exports.markAsRead = async (req, res) => {
     if (changed) {
       await messageEventModel.create({
         message_id: id,
-        event_type: 'read',
+        event_type: 'opened',
         actor_id: req.user.id
       });
-      return res.json({ message: 'Marked as read' });
+      return res.json({ message: 'Marked as opened' });
     }
-    res.json({ message: 'Already marked as read' });
+    res.json({ message: 'Already marked as opened' });
   } catch (err) {
     res.status(500).json({ message: 'Error marking as read', error: err.message });
   }
@@ -301,14 +393,34 @@ exports.submitDraft = async (req, res) => {
     if (Number(message.sender_id) !== Number(req.user.id)) return res.status(403).json({ message: 'Forbidden' });
     if (!message.receiver_id) return res.status(400).json({ message: 'Cannot submit draft without a receiver' });
 
-    const affected = await messageModel.submit(id, req.user.id);
+    const sender = await userModel.findById(message.sender_id);
+    const receiver = await userModel.findById(message.receiver_id);
+    const letterPayload = buildLetterPayload({
+      template_type: message.template_type,
+      reference_number: message.reference_number,
+      sender,
+      receiver,
+      subject: message.subject,
+      content: message.raw_content || message.content,
+      // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
+      attachments: []
+    });
+    const formatted_content = generateLetterHtml(letterPayload);
+    const pdf_path = await generateLetterPdf(letterPayload);
+    const affected = await messageModel.submit(id, req.user.id, { formatted_content, pdf_path });
     if (!affected) return res.status(400).json({ message: 'Only draft messages can be submitted' });
     await messageEventModel.create({
       message_id: id,
-      event_type: 'submitted',
+      event_type: 'sent',
       actor_id: req.user.id,
       from_status: 'draft',
-      to_status: 'submitted'
+      to_status: 'delivered'
+    });
+    await messageEventModel.create({
+      message_id: id,
+      event_type: 'delivered',
+      actor_id: req.user.id,
+      to_status: 'delivered'
     });
     res.json({ message: 'Draft submitted' });
   } catch (err) {
@@ -327,20 +439,45 @@ exports.forwardMessage = async (req, res) => {
     if (!message) return res.status(404).json({ message: 'Message not found' });
     if (!canAccessMessage(req.user, message)) return res.status(403).json({ message: 'Forbidden' });
     const forwardedMessages = [];
+    const sender = await userModel.findById(req.user.id);
 
     for (const receiverId of selectedReceiverIds) {
-      const { messageId: newId, reference_number } = await forwardMessageWithReference({
-        original_id: id,
-        new_receiver_id: receiverId,
-        actor_id: req.user.id,
-        due_date: due_date || null
-      }, message.department_id);
+      const { messageId: newId, reference_number } = await withLockedReference(async (nextReference) => {
+        const insertedId = await messageModel.forward({
+          original_id: id,
+          new_receiver_id: receiverId,
+          actor_id: req.user.id,
+          reference_number: nextReference,
+          due_date: due_date || null
+        });
+        return { messageId: insertedId, reference_number: nextReference };
+      });
+      const receiver = await userModel.findById(receiverId);
+      const letterPayload = buildLetterPayload({
+        template_type: message.template_type,
+        reference_number,
+        sender,
+        receiver,
+        subject: message.subject,
+        content: message.raw_content || message.content,
+        // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
+        attachments: []
+      });
+      const formatted_content = generateLetterHtml(letterPayload);
+      const pdf_path = await generateLetterPdf(letterPayload);
+      await messageModel.updateGeneratedFields(newId, { formatted_content, pdf_path });
       await messageEventModel.create({
         message_id: newId,
         event_type: 'forwarded',
         actor_id: req.user.id,
         note: note || null,
-        to_status: 'submitted'
+        to_status: 'delivered'
+      });
+      await messageEventModel.create({
+        message_id: newId,
+        event_type: 'delivered',
+        actor_id: req.user.id,
+        to_status: 'delivered'
       });
       forwardedMessages.push({ id: newId, reference_number, receiver_id: receiverId });
     }
@@ -365,5 +502,61 @@ exports.downloadAttachment = async (req, res) => {
     res.download(message.file_path);
   } catch (err) {
     res.status(500).json({ message: 'Error downloading attachment', error: err.message });
+  }
+};
+
+exports.downloadPdf = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const message = await messageModel.getById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+    if (!canAccessMessage(req.user, message)) return res.status(403).json({ message: 'Forbidden' });
+
+    let pdfPath = message.pdf_path;
+    if (!pdfPath) {
+      const sender = await userModel.findById(message.sender_id);
+      const receiver = message.receiver_id ? await userModel.findById(message.receiver_id) : null;
+      const letterPayload = buildLetterPayload({
+        template_type: message.template_type,
+        reference_number: message.reference_number,
+        sender,
+        receiver,
+        subject: message.subject,
+        content: message.raw_content || message.content,
+        // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
+        attachments: [],
+        date: message.submitted_at || message.created_at || new Date()
+      });
+      pdfPath = await generateLetterPdf(letterPayload);
+      await messageModel.updateGeneratedFields(id, { pdf_path: pdfPath });
+    }
+
+    await messageModel.markPdfDownloaded(id, req.user.id);
+    await messageEventModel.create({
+      message_id: id,
+      event_type: 'pdf_downloaded',
+      actor_id: req.user.id
+    });
+    res.download(pdfPath, `${message.reference_number || `message-${id}`}.pdf`);
+  } catch (err) {
+    res.status(500).json({ message: 'Error downloading PDF', error: err.message });
+  }
+};
+
+exports.markPrinted = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const message = await messageModel.getById(id);
+    if (!message) return res.status(404).json({ message: 'Message not found' });
+    if (!canAccessMessage(req.user, message)) return res.status(403).json({ message: 'Forbidden' });
+    await messageModel.markPrinted(id, req.user.id);
+    await messageEventModel.create({
+      message_id: id,
+      event_type: 'printed',
+      actor_id: req.user.id
+    });
+    res.json({ message: 'Print tracked' });
+  } catch (err) {
+    res.status(500).json({ message: 'Error tracking print', error: err.message });
   }
 };

@@ -24,7 +24,7 @@ export default function RegisterPage() {
   }, [location.state]);
 
   useEffect(() => {
-    axios.get('/api/departments', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      axios.get('/api/departments', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } })
       .then(res => {
         if (Array.isArray(res.data)) {
           setDepartments(res.data);
@@ -47,7 +47,7 @@ export default function RegisterPage() {
       body.append('role', role);
       body.append('department_id', departmentId);
       if (profileImage) body.append('profile_image', profileImage);
-      await axios.post('/api/users', body, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+      await axios.post('/api/users', body, { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
       sessionStorage.removeItem(ADMIN_REGISTER_SESSION_KEY);
       setSuccess('User registered successfully!');
       setName(''); setEmail(''); setPassword(''); setRole('staff'); setDepartmentId(''); setProfileImage(null);

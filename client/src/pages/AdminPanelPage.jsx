@@ -28,7 +28,8 @@ export default function AdminPanelPage() {
   });
   const [listError, setListError] = useState('');
 
-  const authHeaders = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } });
+  const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
+
 
   const loadData = useCallback(async () => {
     setListError('');

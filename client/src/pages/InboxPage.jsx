@@ -19,7 +19,7 @@ export default function InboxPage() {
       setError('');
       axios
         .get(`/api/messages/inbox${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
         })
         .then((res) => {
           if (ignore) return;

@@ -1,0 +1,206 @@
+const TEMPLATE_LABELS = {
+  official_letter: 'Official Letter',
+  memo: 'Memo',
+  notice: 'Notice',
+  circular: 'Circular',
+  request_form: 'Request Form'
+};
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function formatDate(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function paragraphsFromContent(content) {
+  const clean = String(content || '').trim();
+  if (!clean) return '<p>&nbsp;</p>';
+  return clean
+    .split(/\n{2,}/)
+    .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+}
+
+function attachmentRows(attachments = []) {
+  const cleanAttachments = attachments.filter((item) => item?.name);
+  if (!cleanAttachments.length) return '';
+
+  const rows = cleanAttachments.map((item) => {
+    const size = Number(item.size);
+    const sizeLabel = Number.isFinite(size) && size > 0 ? ` (${Math.ceil(size / 1024)} KB)` : '';
+    return `<li>${escapeHtml(item.name)}${escapeHtml(sizeLabel)}</li>`;
+  }).join('');
+
+  return `
+    <section class="letter-attachments">
+      <strong>Attachments:</strong>
+      <ul>${rows}</ul>
+    </section>
+  `;
+}
+
+function signatureBlock(data) {
+  const title = data.senderTitle ? `<span>${escapeHtml(data.senderTitle)}</span>` : '';
+  const signature = data.signatureImagePath
+    ? `<img class="letter-signature-image" src="${escapeHtml(data.signatureImagePath)}" alt="">`
+    : '';
+  return `
+    <section class="letter-signature">
+      ${signature}
+      <strong>${escapeHtml(data.senderName)}</strong>
+      ${title}
+    </section>
+  `;
+}
+
+function baseHeader(data, templateLabel) {
+  return `
+    <header class="letter-header">
+      <div class="letter-logo-slot">${data.logoUrl ? `<img src="${escapeHtml(data.logoUrl)}" alt="">` : ''}</div>
+      <div>
+        <h1>MESOB INTERNAL MESSAGING SYSTEM</h1>
+        <p>${escapeHtml(templateLabel)} Internal Correspondence</p>
+      </div>
+    </header>
+    <section class="letter-meta-grid">
+      <div><strong>Reference No:</strong> ${escapeHtml(data.referenceNumber)}</div>
+      <div><strong>Date:</strong> ${escapeHtml(formatDate(data.date))}</div>
+      <div><strong>From:</strong> ${escapeHtml(data.senderName)}</div>
+      <div><strong>To:</strong> ${escapeHtml(data.recipientName)}</div>
+    </section>
+  `;
+}
+
+function officialLetter(data) {
+  return `
+    ${baseHeader(data, 'Official')}
+    <section class="letter-subject"><span>Subject</span><strong>${escapeHtml(data.subject)}</strong></section>
+    <section class="letter-body">
+      <p>Dear ${escapeHtml(data.recipientName)},</p>
+      ${paragraphsFromContent(data.body)}
+      <p>Kind regards,</p>
+    </section>
+    ${attachmentRows(data.attachments)}
+    ${signatureBlock(data)}
+  `;
+}
+
+function memo(data) {
+  return `
+    ${baseHeader(data, 'Memo')}
+    <section class="letter-subject"><span>Memo</span><strong>${escapeHtml(data.subject)}</strong></section>
+    <section class="letter-body">
+      ${paragraphsFromContent(data.body)}
+      <p>For your information and necessary action.</p>
+    </section>
+    ${attachmentRows(data.attachments)}
+    ${signatureBlock(data)}
+  `;
+}
+
+function notice(data) {
+  return `
+    ${baseHeader(data, 'Notice')}
+    <section class="letter-notice-title">NOTICE</section>
+    <section class="letter-subject"><span>Regarding</span><strong>${escapeHtml(data.subject)}</strong></section>
+    <section class="letter-body">${paragraphsFromContent(data.body)}</section>
+    ${attachmentRows(data.attachments)}
+    ${signatureBlock(data)}
+  `;
+}
+
+function circular(data) {
+  return `
+    ${baseHeader(data, 'Circular')}
+    <section class="letter-notice-title">CIRCULAR</section>
+    <section class="letter-subject"><span>Subject</span><strong>${escapeHtml(data.subject)}</strong></section>
+    <section class="letter-body">
+      <p>Dear Team,</p>
+      ${paragraphsFromContent(data.body)}
+      <p>Kind regards,</p>
+    </section>
+    ${attachmentRows(data.attachments)}
+    ${signatureBlock(data)}
+  `;
+}
+
+function requestForm(data) {
+  return `
+    ${baseHeader(data, 'Request Form')}
+    <section class="letter-subject"><span>Request</span><strong>${escapeHtml(data.subject)}</strong></section>
+    <section class="letter-request-box">
+      <div><strong>Requested by</strong><span>${escapeHtml(data.senderName)}</span></div>
+      <div><strong>Submitted to</strong><span>${escapeHtml(data.recipientName)}</span></div>
+      <div><strong>Reference</strong><span>${escapeHtml(data.referenceNumber)}</span></div>
+    </section>
+    <section class="letter-body">${paragraphsFromContent(data.body)}</section>
+    ${attachmentRows(data.attachments)}
+    ${signatureBlock(data)}
+  `;
+}
+
+const TEMPLATE_RENDERERS = {
+  official_letter: officialLetter,
+  memo,
+  notice,
+  circular,
+  request_form: requestForm
+};
+
+function normalizeTemplateType(templateType) {
+  return TEMPLATE_RENDERERS[templateType] ? templateType : 'official_letter';
+}
+
+function buildLetterData(input = {}) {
+  return {
+    templateType: normalizeTemplateType(input.templateType),
+    referenceNumber: input.referenceNumber || 'IMS-PREVIEW',
+    date: input.date || new Date(),
+    senderName: input.senderName || 'Sender',
+    senderTitle: input.senderTitle || '',
+    recipientName: input.recipientName || 'Recipient',
+    subject: input.subject || '(No subject)',
+    body: input.body || '',
+    attachments: Array.isArray(input.attachments) ? input.attachments : [],
+    signatureImagePath: input.signatureImagePath || '',
+    logoUrl: input.logoUrl || '/qms-logo.png'
+  };
+}
+
+function generateLetterHtml(input) {
+  const data = buildLetterData(input);
+  const label = TEMPLATE_LABELS[data.templateType] || TEMPLATE_LABELS.official_letter;
+  const body = TEMPLATE_RENDERERS[data.templateType](data);
+
+  return `
+    <article class="official-letter" data-template="${escapeHtml(data.templateType)}">
+      ${body}
+      <footer class="letter-footer">${escapeHtml(label)} generated by MESOB Internal Messaging System</footer>
+    </article>
+  `.trim();
+}
+
+function getTemplateOptions() {
+  return Object.entries(TEMPLATE_LABELS).map(([value, label]) => ({ value, label }));
+}
+
+module.exports = {
+  escapeHtml,
+  formatDate,
+  generateLetterHtml,
+  getTemplateOptions,
+  normalizeTemplateType,
+  buildLetterData
+};

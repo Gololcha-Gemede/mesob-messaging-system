@@ -6,6 +6,7 @@ const { authenticateToken, authorizeRoles } = require('../middleware/auth');
 const upload = require('../middleware/multer');
 
 router.post('/', authenticateToken, upload.single('file'), messageController.sendMessage);
+router.post('/preview', authenticateToken, messageController.previewMessage);
 router.get('/inbox', authenticateToken, messageController.getInbox);
 router.get('/sent', authenticateToken, messageController.getSent);
 router.get('/drafts', authenticateToken, messageController.getDrafts);
@@ -22,6 +23,8 @@ router.patch('/:id/read', authenticateToken, messageController.markAsRead);
 router.post('/:id/submit', authenticateToken, messageController.submitDraft);
 router.post('/:id/forward', authenticateToken, messageController.forwardMessage);
 router.get('/:id/attachment', authenticateToken, messageController.downloadAttachment);
+router.get('/:id/pdf', authenticateToken, messageController.downloadPdf);
+router.post('/:id/print', authenticateToken, messageController.markPrinted);
 
 // TODO: Add forwarding, search, filter, download endpoints
 

@@ -34,10 +34,43 @@ async function initSchema() {
   await ensureColumn('messages', 'parent_message_id', 'parent_message_id INT NULL');
   await ensureColumn('messages', 'due_date', 'due_date DATE NULL');
   await ensureColumn('messages', 'created_at', 'created_at DATETIME NULL');
-  await ensureColumn('messages', 'is_formal_letter', 'is_formal_letter TINYINT(1) NOT NULL DEFAULT 0');
-  await ensureColumn('messages', 'letter_html', 'letter_html MEDIUMTEXT NULL');
-  await ensureColumn('messages', 'pdf_path', 'pdf_path VARCHAR(255) NULL');
+  await ensureColumn('messages', 'raw_content', 'raw_content TEXT NULL');
+  await ensureColumn('messages', 'formatted_content', 'formatted_content MEDIUMTEXT NULL');
+  await ensureColumn('messages', 'template_type', "template_type VARCHAR(40) NOT NULL DEFAULT 'official_letter'");
+  await ensureColumn('messages', 'pdf_path', 'pdf_path VARCHAR(500) NULL');
+  await ensureColumn('messages', 'opened_at', 'opened_at DATETIME NULL');
+  await ensureColumn('messages', 'printed_at', 'printed_at DATETIME NULL');
+  await ensureColumn('messages', 'downloaded_at', 'downloaded_at DATETIME NULL');
+  await ensureColumn('messages', 'delivered_at', 'delivered_at DATETIME NULL');
+  await ensureColumn('messages', 'file_name', 'file_name VARCHAR(255) NULL');
+  await ensureColumn('messages', 'file_mime', 'file_mime VARCHAR(120) NULL');
+  await ensureColumn('messages', 'file_size', 'file_size INT NULL');
   await ensureColumn('users', 'profile_image_path', 'profile_image_path VARCHAR(255) NULL');
+  await ensureColumn('users', 'position_title', 'position_title VARCHAR(255) NULL');
+  await ensureColumn('users', 'signature_image_path', 'signature_image_path VARCHAR(255) NULL');
+
+  await pool.query(
+    `UPDATE messages
+     SET raw_content = COALESCE(raw_content, content),
+         template_type = COALESCE(NULLIF(template_type, ''), 'official_letter')`
+  );
+
+  // Ensure status enum matches the schema in setup-database.sql without crashing if data doesn't fit.
+  // If existing rows contain unexpected status values, map them to 'draft' first.
+  await pool.query(
+    `UPDATE messages
+     SET status = 'draft'
+     WHERE status NOT IN ('draft','submitted','received','read','sent','delivered','opened','printed','downloaded_pdf')`
+  );
+
+  // Then try to align enum definition.
+  // (Some MySQL versions can throw data truncation if enum set differs; above update prevents that.)
+  await pool.query(
+    `ALTER TABLE messages
+     MODIFY status ENUM('draft', 'submitted', 'received', 'read', 'sent', 'delivered', 'opened', 'printed', 'downloaded_pdf')
+     DEFAULT 'draft'`
+  );
+
 
   const [indexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'uniq_reference_number'");
   if (!indexes.length) {
@@ -47,6 +80,11 @@ async function initSchema() {
   const [parentIndexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'idx_messages_parent_message_id'");
   if (!parentIndexes.length) {
     await pool.query('CREATE INDEX idx_messages_parent_message_id ON messages (parent_message_id)');
+  }
+
+  const [pdfIndexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'idx_messages_pdf_path'");
+  if (!pdfIndexes.length) {
+    await pool.query('CREATE INDEX idx_messages_pdf_path ON messages (pdf_path)');
   }
 }
 

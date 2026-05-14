@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import RecipientPicker from '../components/RecipientPicker';
+import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
 
 function formatEventType(type) {
@@ -23,7 +24,8 @@ export default function MessageDetailPage() {
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
   const [isForwarding, setIsForwarding] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const token = localStorage.getItem('token');
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
+  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
   const visibleHistory = useMemo(() => {
     const forwardedChildren = new Set(
@@ -137,6 +139,40 @@ export default function MessageDetailPage() {
     }
   };
 
+  const handlePdfDownload = async () => {
+    try {
+      setIsDownloadingPdf(true);
+      setError('');
+      const res = await axios.get(`/api/messages/${message.id}/pdf`, {
+        headers: authHeaders,
+        responseType: 'blob'
+      });
+      const url = URL.createObjectURL(res.data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${message.reference_number || `message-${message.id}`}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      await loadMessage();
+    } catch (err) {
+      setError(err?.response?.data?.message || 'Could not download PDF.');
+    } finally {
+      setIsDownloadingPdf(false);
+    }
+  };
+
+  const handlePrintLetter = async () => {
+    try {
+      await axios.post(`/api/messages/${message.id}/print`, {}, { headers: authHeaders });
+      await loadHistory();
+    } catch {
+      // Printing should still be available if tracking fails transiently.
+    }
+    window.print();
+  };
+
   if (error && !message) return <div className="message-detail-container"><div className="error banner-message">{error}</div></div>;
   if (loading || !message) return <div className="message-detail-container"><div className="list-state">Loading message...</div></div>;
 
@@ -148,18 +184,25 @@ export default function MessageDetailPage() {
         <div><strong>To:</strong> {message.receiver_name || message.receiver_id}</div>
         <div><strong>Reference:</strong> {message.reference_number}</div>
         <div><strong>Status:</strong> <span className={`status-pill status-${message.status}`}>{message.status}</span></div>
+        {message.template_type && <div><strong>Template:</strong> {String(message.template_type).replace(/_/g, ' ')}</div>}
         {message.due_date && <div><strong>Due date:</strong> {String(message.due_date).slice(0, 10)}</div>}
       </div>
-      {message.is_formal_letter && message.letter_html ? (
-        <div className="formal-letter-view" dangerouslySetInnerHTML={{ __html: message.letter_html }} />
-      ) : (
-        <p className="message-content">{message.content}</p>
-      )}
-      {message.file_path && (
-        <button type="button" className="attachment-link-button" onClick={handleAttachmentDownload} disabled={isDownloading}>
-          {isDownloading ? 'Downloading...' : 'Download Attachment'}
+      <div className="document-action-row">
+        <button type="button" className="attachment-link-button" onClick={handlePdfDownload} disabled={isDownloadingPdf}>
+          {isDownloadingPdf ? 'Downloading PDF...' : 'Download PDF'}
         </button>
-      )}
+        <button type="button" className="secondary-btn print-letter-btn" onClick={handlePrintLetter}>
+          Print Letter
+        </button>
+        {message.file_path && (
+          <button type="button" className="secondary-btn" onClick={handleAttachmentDownload} disabled={isDownloading}>
+            {isDownloading ? 'Downloading...' : 'Download Attachment'}
+          </button>
+        )}
+      </div>
+      <section className="message-document-wrap" aria-label="Formatted letter">
+        <LetterRenderer html={message.formatted_content} fallback={message.raw_content || message.content} />
+      </section>
 
       {message.status === 'draft' && (
         <div className="detail-section">
