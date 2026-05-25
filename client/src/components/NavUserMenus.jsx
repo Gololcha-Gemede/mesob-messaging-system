@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
@@ -72,7 +72,6 @@ export default function NavUserMenus({ token }) {
   const [profile, setProfile] = useState(null);
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState({ name: '', email: '', password: '', profile_image: null });
-  const [profilePreviewUrl, setProfilePreviewUrl] = useState('');
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileMessage, setProfileMessage] = useState('');
   const [profileMessageTone, setProfileMessageTone] = useState('');
@@ -84,17 +83,17 @@ export default function NavUserMenus({ token }) {
     editingProfileRef.current = editingProfile;
   }, [editingProfile]);
 
-  useEffect(() => {
-    if (!profileForm.profile_image) {
-      setProfilePreviewUrl('');
-      return undefined;
-    }
-    const url = URL.createObjectURL(profileForm.profile_image);
-    setProfilePreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [profileForm.profile_image]);
+  const profilePreviewUrl = useMemo(
+    () => (profileForm.profile_image ? URL.createObjectURL(profileForm.profile_image) : ''),
+    [profileForm.profile_image]
+  );
 
-  const loadNavData = async (showLoading = false) => {
+  useEffect(() => {
+    if (!profilePreviewUrl) return undefined;
+    return () => URL.revokeObjectURL(profilePreviewUrl);
+  }, [profilePreviewUrl]);
+
+  const loadNavData = useCallback(async (showLoading = false) => {
     if (!token) return;
     if (showLoading) setNotificationsLoading(true);
     const headers = { Authorization: `Bearer ${token}` };
@@ -129,7 +128,7 @@ export default function NavUserMenus({ token }) {
     } finally {
       if (showLoading) setNotificationsLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     if (!token) return undefined;
@@ -146,13 +145,7 @@ export default function NavUserMenus({ token }) {
       ignore = true;
       window.clearInterval(interval);
     };
-  }, [token, location.pathname]);
-
-  useEffect(() => {
-    if (notificationsOpen && token) {
-      loadNavData(true);
-    }
-  }, [notificationsOpen, token]);
+  }, [token, location.pathname, loadNavData]);
 
   const closeMenus = (resetEdit = true) => {
     setNotificationsOpen(false);
@@ -268,6 +261,7 @@ export default function NavUserMenus({ token }) {
     setEditingProfile(false);
     setProfileMessage('');
     setProfileMessageTone('');
+    if (shouldOpen) loadNavData(true);
   };
 
   const toggleProfile = () => {

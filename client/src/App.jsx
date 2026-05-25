@@ -12,8 +12,6 @@ import MessageDetailPage from './pages/MessageDetailPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import TrackMessagePage from './pages/TrackMessagePage';
 import NavUserMenus from './components/NavUserMenus';
-import DMInboxPage from './pages/DMInboxPage';
-import DMChatPage from './pages/DMChatPage';
 
 import { roleFromToken, ADMIN_REGISTER_SESSION_KEY, LOGIN_ENTRANCE_KEY } from './utils/jwt';
 
@@ -56,7 +54,6 @@ function Icon({ name }) {
 		drafts: 'M4 4h16v16H4V4Zm4 5h8M8 13h6',
 		compose: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z',
 		track: 'M21 21l-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm0-11v4l2.5 1.5',
-		chat: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5ZM8 10h9M8 14h6',
 		admin: 'M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7l8-4Zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-3 5a3 3 0 0 1 6 0',
 		users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
 		departments: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h1M9 13h1M9 17h1',
@@ -149,7 +146,6 @@ function SideBar() {
 		admin: location.pathname === '/admin'
 	});
 	const [unreadInboxCount, setUnreadInboxCount] = useState(0);
-	const [unreadDmCount, setUnreadDmCount] = useState(0);
 
 	useEffect(() => {
 		if (!token) {
@@ -158,21 +154,12 @@ function SideBar() {
 		let ignore = false;
 		const headers = { Authorization: `Bearer ${token}` };
 		const loadUnread = async () => {
-			const [dashboardResult, dmResult] = await Promise.allSettled([
-				axios.get('/api/search/dashboard', { headers }),
-				axios.get('/api/dm/threads', { headers })
-			]);
+			const dashboardResult = await axios.get('/api/search/dashboard', { headers }).catch(() => null);
 			if (ignore) return;
-			if (dashboardResult.status === 'fulfilled') {
-				setUnreadInboxCount(Number(dashboardResult.value?.data?.unread) || 0);
+			if (dashboardResult) {
+				setUnreadInboxCount(Number(dashboardResult.data?.unread) || 0);
 			} else {
 				setUnreadInboxCount(0);
-			}
-			if (dmResult.status === 'fulfilled') {
-				const threads = Array.isArray(dmResult.value?.data) ? dmResult.value.data : [];
-				setUnreadDmCount(threads.reduce((sum, thread) => sum + (Number(thread.unread_count) || 0), 0));
-			} else {
-				setUnreadDmCount(0);
 			}
 		};
 		loadUnread();
@@ -202,7 +189,6 @@ function SideBar() {
 				</div>
 			</div>
 			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/" end><Icon name="dashboard" /><span className="side-nav-label">Dashboard</span></NavLink>
-			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/dm"><Icon name="chat" /><span className="side-nav-label">Chat</span>{unreadDmCount > 0 ? <span className="inbox-unread-badge">{unreadDmCount}</span> : null}</NavLink>
 			<div className={`side-nav-group${openGroups.messages ? ' side-nav-group--open' : ''}`}>
 				<button type="button" className={`side-nav-link side-nav-group-trigger${messagesActive ? ' side-nav-link--active-parent' : ''}`} onClick={() => toggleGroup('messages')} aria-expanded={openGroups.messages}>
 					<span><Icon name="inbox" /><span className="side-nav-label">Messages</span></span>
@@ -281,8 +267,6 @@ function AppLayout() {
 								<Route path="/inbox" element={<PrivateRoute><InboxPage /></PrivateRoute>} />
 								<Route path="/sent" element={<PrivateRoute><SentPage /></PrivateRoute>} />
 								<Route path="/drafts" element={<PrivateRoute><DraftsPage /></PrivateRoute>} />
-								<Route path="/dm" element={<PrivateRoute><DMInboxPage /></PrivateRoute>} />
-								<Route path="/dm/:otherUserId" element={<PrivateRoute><DMChatPage /></PrivateRoute>} />
 								<Route path="/track" element={<PrivateRoute><TrackMessagePage /></PrivateRoute>} />
 								<Route path="/compose" element={<PrivateRoute><ComposeMessagePage /></PrivateRoute>} />
 											<Route path="/messages/:id" element={<PrivateRoute><MessageDetailPage /></PrivateRoute>} />

@@ -67,8 +67,6 @@ function letterLines(input) {
     lines.push({ text: `Requested by: ${data.senderName}`, font: 'regular', size: 11 });
     lines.push({ text: `Submitted to: ${data.recipientName}`, font: 'regular', size: 11 });
     lines.push({ spacer: 8 });
-  } else if (data.templateType === 'direct_message') {
-    lines.push({ text: `To: ${data.recipientName}`, font: 'regular', size: 11 });
   } else {
     lines.push({ text: `Dear ${data.recipientName},`, font: 'regular', size: 11 });
   }
@@ -81,7 +79,7 @@ function letterLines(input) {
   lines.push({ spacer: 12 });
   if (data.templateType === 'memo') {
     lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });
-  } else if (data.templateType !== 'direct_message') {
+  } else {
     lines.push({ text: 'Kind regards,', font: 'regular', size: 11 });
   }
 

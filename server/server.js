@@ -30,9 +30,6 @@ app.use('/api/tasks', taskRoutes);
 const searchRoutes = require('./routes/search');
 app.use('/api/search', searchRoutes);
 
-const dmRoutes = require('./routes/dm');
-app.use('/api/dm', dmRoutes);
-
 const PORT = process.env.PORT || 5000;
 
 async function startServer() {

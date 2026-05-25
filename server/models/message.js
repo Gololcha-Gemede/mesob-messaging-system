@@ -1,8 +1,6 @@
 const pool = require('./db');
-const DM_ONLY_M = "m.template_type = 'direct_message'";
 
 module.exports = {
-  DM_ONLY_M,
   async create(message) {
     const {
       sender_id,
@@ -23,8 +21,7 @@ module.exports = {
       department_id,
       due_date = null,
       is_formal_letter = 0,
-      letter_html = null,
-      pdf_path = null
+      letter_html = null
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (
