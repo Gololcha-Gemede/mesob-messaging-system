@@ -55,16 +55,21 @@ module.exports = {
     return c;
   },
   async getRecipients({ query, excludeUserId }) {
-    let sql = 'SELECT id, name, email, role, department_id, profile_image_path, position_title, signature_image_path FROM users WHERE id != ?';
+    let sql = `
+      SELECT u.id, u.name, u.email, u.role, u.department_id, u.profile_image_path,
+             u.position_title, u.signature_image_path, d.name AS department_name
+      FROM users u
+      LEFT JOIN departments d ON d.id = u.department_id
+      WHERE u.id != ?`;
     const params = [excludeUserId];
 
     if (query) {
-      sql += ' AND (name LIKE ? OR email LIKE ?)';
+      sql += ' AND (u.name LIKE ? OR u.email LIKE ? OR d.name LIKE ?)';
       const likeQuery = `%${query}%`;
-      params.push(likeQuery, likeQuery);
+      params.push(likeQuery, likeQuery, likeQuery);
     }
 
-    sql += ' ORDER BY name ASC';
+    sql += ' ORDER BY d.name ASC, u.name ASC';
     const [rows] = await pool.query(sql, params);
     return rows;
   },

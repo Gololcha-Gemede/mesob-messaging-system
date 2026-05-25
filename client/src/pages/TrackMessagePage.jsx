@@ -25,8 +25,8 @@ export default function TrackMessagePage() {
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
-  const isAdmin = roleFromToken(token) === 'admin';
+  const token = sessionStorage.getItem('token');
+  const isAdmin = token ? roleFromToken(token) === 'admin' : false;
 
   const handleSubmit = async (e) => {
     e.preventDefault();

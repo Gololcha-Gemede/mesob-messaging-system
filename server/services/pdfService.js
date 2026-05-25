@@ -67,6 +67,8 @@ function letterLines(input) {
     lines.push({ text: `Requested by: ${data.senderName}`, font: 'regular', size: 11 });
     lines.push({ text: `Submitted to: ${data.recipientName}`, font: 'regular', size: 11 });
     lines.push({ spacer: 8 });
+  } else if (data.templateType === 'direct_message') {
+    lines.push({ text: `To: ${data.recipientName}`, font: 'regular', size: 11 });
   } else {
     lines.push({ text: `Dear ${data.recipientName},`, font: 'regular', size: 11 });
   }
@@ -79,7 +81,7 @@ function letterLines(input) {
   lines.push({ spacer: 12 });
   if (data.templateType === 'memo') {
     lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });
-  } else {
+  } else if (data.templateType !== 'direct_message') {
     lines.push({ text: 'Kind regards,', font: 'regular', size: 11 });
   }
 
@@ -93,7 +95,11 @@ function letterLines(input) {
     });
   }
 
+  // Watermark (drawn near bottom center on each page via PDF stream)
+  // Keeping it lightweight: add text lines at the end so it shows without requiring PDF image support.
   lines.push({ spacer: 18 });
+  lines.push({ text: 'MESOB', font: 'regular', size: 9, center: true, watermark: true });
+  lines.push({ spacer: 8 });
   lines.push({ text: data.senderName, font: 'bold', size: 11 });
   if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10 });
   lines.push({ spacer: 16 });
@@ -140,7 +146,18 @@ function streamForPage(lines) {
     const size = line.size || 11;
     const approxWidth = String(line.text || '').length * size * 0.48;
     const x = line.center ? Math.max(LEFT, (PAGE_WIDTH - approxWidth) / 2) : LEFT;
+
+    // Optional watermark styling (light gray)
+    if (line.watermark) {
+      commands.push('0.75 0.75 0.75 rg');
+    }
+
     commands.push(`BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(line.text)}) Tj ET`);
+
+    if (line.watermark) {
+      commands.push('0 0 0 rg');
+    }
+
     y -= Math.max(LINE_HEIGHT, size + 5);
   });
 

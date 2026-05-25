@@ -2,9 +2,11 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { authenticateToken } = require('../middleware/auth');
+const { loginRateLimiter } = require('../middleware/security');
 const upload = require('../middleware/multer');
 
-router.post('/login', authController.login);
+router.post('/login', loginRateLimiter, authController.login);
+router.post('/register', authController.register);
 router.get('/me', authenticateToken, authController.me);
 router.put('/me', authenticateToken, upload.single('profile_image'), authController.updateMe);
 

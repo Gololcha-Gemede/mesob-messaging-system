@@ -10,7 +10,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [role, setRole] = useState('staff');
+  const [role, setRole] = useState('user');
   const [departmentId, setDepartmentId] = useState('');
   const [profileImage, setProfileImage] = useState(null);
   const [departments, setDepartments] = useState([]);
@@ -50,7 +50,7 @@ export default function RegisterPage() {
       await axios.post('/api/users', body, { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
       sessionStorage.removeItem(ADMIN_REGISTER_SESSION_KEY);
       setSuccess('User registered successfully!');
-      setName(''); setEmail(''); setPassword(''); setRole('staff'); setDepartmentId(''); setProfileImage(null);
+      setName(''); setEmail(''); setPassword(''); setRole('user'); setDepartmentId(''); setProfileImage(null);
       setError('');
     } catch {
       setError('Registration failed.');
@@ -62,7 +62,7 @@ export default function RegisterPage() {
     <AuthPageLayout
       title="Register user"
       subtitle="Create a staff or admin account"
-      footerLink={{ to: '/admin', label: '← Back to admin' }}
+      footerLink={{ to: '/admin', label: '< Back to admin' }}
     >
       <form className="auth-form" onSubmit={handleSubmit}>
         <AuthInputRow icon="user">
@@ -111,7 +111,7 @@ export default function RegisterPage() {
         </AuthInputRow>
         <AuthInputRow icon="list">
           <select className="auth-field auth-select" value={role} onChange={e => setRole(e.target.value)} required>
-            <option value="staff">Staff</option>
+            <option value="user">Staff</option>
             <option value="admin">Admin</option>
           </select>
         </AuthInputRow>

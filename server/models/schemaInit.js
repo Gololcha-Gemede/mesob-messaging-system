@@ -29,6 +29,21 @@ async function initSchema() {
     )`
   );
 
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      event_type VARCHAR(80) NOT NULL,
+      actor_id INT NULL,
+      ip VARCHAR(80) NULL,
+      user_agent VARCHAR(255) NULL,
+      details JSON NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_audit_logs_event_type (event_type),
+      INDEX idx_audit_logs_actor_id (actor_id),
+      INDEX idx_audit_logs_created_at (created_at)
+    )`
+  );
+
   await ensureColumn('messages', 'submitted_at', 'submitted_at DATETIME NULL');
   await ensureColumn('messages', 'read_at', 'read_at DATETIME NULL');
   await ensureColumn('messages', 'parent_message_id', 'parent_message_id INT NULL');
@@ -45,6 +60,11 @@ async function initSchema() {
   await ensureColumn('messages', 'file_name', 'file_name VARCHAR(255) NULL');
   await ensureColumn('messages', 'file_mime', 'file_mime VARCHAR(120) NULL');
   await ensureColumn('messages', 'file_size', 'file_size INT NULL');
+  await ensureColumn('messages', 'sender_name', 'sender_name VARCHAR(255) NULL');
+  await ensureColumn('messages', 'is_flagged', 'is_flagged BOOLEAN NOT NULL DEFAULT FALSE');
+  await ensureColumn('messages', 'is_archived', 'is_archived BOOLEAN NOT NULL DEFAULT FALSE');
+  await ensureColumn('messages', 'view_count', 'view_count INT NOT NULL DEFAULT 0');
+  await ensureColumn('messages', 'last_activity_at', 'last_activity_at DATETIME NULL');
   await ensureColumn('users', 'profile_image_path', 'profile_image_path VARCHAR(255) NULL');
   await ensureColumn('users', 'position_title', 'position_title VARCHAR(255) NULL');
   await ensureColumn('users', 'signature_image_path', 'signature_image_path VARCHAR(255) NULL');
@@ -85,6 +105,11 @@ async function initSchema() {
   const [pdfIndexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'idx_messages_pdf_path'");
   if (!pdfIndexes.length) {
     await pool.query('CREATE INDEX idx_messages_pdf_path ON messages (pdf_path)');
+  }
+
+  const [archivedIndexes] = await pool.query("SHOW INDEX FROM messages WHERE Key_name = 'idx_messages_is_archived'");
+  if (!archivedIndexes.length) {
+    await pool.query('CREATE INDEX idx_messages_is_archived ON messages (is_archived)');
   }
 }
 

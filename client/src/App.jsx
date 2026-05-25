@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
@@ -11,16 +11,20 @@ import ComposeMessagePage from './pages/ComposeMessagePage';
 import MessageDetailPage from './pages/MessageDetailPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import TrackMessagePage from './pages/TrackMessagePage';
-import { roleFromToken, ADMIN_REGISTER_SESSION_KEY } from './utils/jwt';
-import { notify } from './utils/notify';
+import NavUserMenus from './components/NavUserMenus';
+import DMInboxPage from './pages/DMInboxPage';
+import DMChatPage from './pages/DMChatPage';
+
+import { roleFromToken, ADMIN_REGISTER_SESSION_KEY, LOGIN_ENTRANCE_KEY } from './utils/jwt';
 
 	function PrivateRoute({ children }) {
-		const token = sessionStorage.getItem('token');
-		return token ? children : <Navigate to="/login" replace />;
+  const token = sessionStorage.getItem('token');
+	return token ? children : <Navigate to="/login" replace />;
 	}
 
 
-function AdminRoute({ children }) {
+
+	function AdminRoute({ children }) {
 	const token = sessionStorage.getItem('token');
 	const role = roleFromToken(token);
 	if (!token) return <Navigate to="/login" replace />;
@@ -30,6 +34,7 @@ function AdminRoute({ children }) {
 
 function RegisterRoute() {
 	const token = sessionStorage.getItem('token');
+
 	const location = useLocation();
 	const role = roleFromToken(token);
 	const fromAdmin =
@@ -51,9 +56,8 @@ function Icon({ name }) {
 		drafts: 'M4 4h16v16H4V4Zm4 5h8M8 13h6',
 		compose: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5Z',
 		track: 'M21 21l-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Zm0-11v4l2.5 1.5',
+		chat: 'M21 11.5a8.4 8.4 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.4 8.4 0 0 1-3.8-.9L3 21l1.9-5.7A8.4 8.4 0 0 1 4 11.5 8.5 8.5 0 0 1 12.5 3 8.5 8.5 0 0 1 21 11.5ZM8 10h9M8 14h6',
 		admin: 'M12 3l8 4v5c0 5-3.4 8.5-8 9-4.6-.5-8-4-8-9V7l8-4Zm0 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm-3 5a3 3 0 0 1 6 0',
-		bell: 'M18 16v-5a6 6 0 0 0-12 0v5l-2 2h16l-2-2Zm-4 4a2 2 0 0 1-4 0',
-		profile: 'M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-8 9a8 8 0 0 1 16 0',
 		users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
 		departments: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h1M9 13h1M9 17h1',
 		chevron: 'm6 9 6 6 6-6',
@@ -99,156 +103,9 @@ function ToastHost() {
 	);
 }
 
-function getProfileInitial(profile) {
-	const name = String(profile?.name || profile?.email || 'U').trim();
-	return (name[0] || 'U').toUpperCase();
-}
-
-function profileImageSrc(profile) {
-	const path = profile?.profile_image_path;
-	if (!path) return '';
-	return String(path).startsWith('http') ? path : path;
-}
-
-	function NavBar() {
-		const token = sessionStorage.getItem('token');
-
-	const navigate = useNavigate();
-	const location = useLocation();
+function NavBar() {
+	const token = sessionStorage.getItem('token');
 	const homePath = token ? '/' : '/login';
-	const [notificationsOpen, setNotificationsOpen] = useState(false);
-	const [profileOpen, setProfileOpen] = useState(false);
-	const [notifications, setNotifications] = useState([]);
-	const [notificationCount, setNotificationCount] = useState(0);
-	const [profile, setProfile] = useState(null);
-	const [editingProfile, setEditingProfile] = useState(false);
-	const [profileForm, setProfileForm] = useState({ name: '', email: '', password: '', profile_image: null });
-	const [profileSaving, setProfileSaving] = useState(false);
-	const [profileMessage, setProfileMessage] = useState('');
-	const [pinnedMenu, setPinnedMenu] = useState(null);
-	const navActionsRef = useRef(null);
-	const lastNotificationCountRef = useRef(null);
-	const editingProfileRef = useRef(false);
-
-	useEffect(() => {
-		editingProfileRef.current = editingProfile;
-	}, [editingProfile]);
-
-	useEffect(() => {
-		if (!token) return;
-		let ignore = false;
-		const headers = { Authorization: `Bearer ${token}` };
-		const loadNavData = () => Promise.allSettled([
-			axios.get('/api/messages/notifications', { headers }),
-			axios.get('/api/auth/me', { headers })
-		]).then(([notificationsRes, profileRes]) => {
-			if (ignore) return;
-			if (notificationsRes.status === 'fulfilled') {
-				const data = notificationsRes.value.data;
-				const nextCount = Number(data?.count) || 0;
-				setNotifications(Array.isArray(data?.messages) ? data.messages : []);
-				setNotificationCount(nextCount);
-				if (lastNotificationCountRef.current !== null && nextCount > lastNotificationCountRef.current) {
-					notify({ type: 'info', title: 'New Message Received notification', message: 'You have a new unread message.' });
-				}
-				lastNotificationCountRef.current = nextCount;
-			}
-			if (profileRes.status === 'fulfilled') {
-				setProfile(profileRes.value.data);
-				if (!editingProfileRef.current) {
-					setProfileForm({
-						name: profileRes.value.data?.name || '',
-						email: profileRes.value.data?.email || '',
-						password: '',
-						profile_image: null
-					});
-				}
-			}
-		});
-		loadNavData();
-		const interval = window.setInterval(loadNavData, 30000);
-		return () => {
-			ignore = true;
-			window.clearInterval(interval);
-		};
-	}, [token, location.pathname]);
-
-	useEffect(() => {
-		const closeMenus = (event) => {
-			if (!navActionsRef.current?.contains(event.target)) {
-				setNotificationsOpen(false);
-				setProfileOpen(false);
-				setEditingProfile(false);
-				setProfileMessage('');
-				setPinnedMenu(null);
-			}
-		};
-		document.addEventListener('pointerdown', closeMenus);
-		return () => document.removeEventListener('pointerdown', closeMenus);
-	}, []);
-
-	const logout = () => {
-		sessionStorage.removeItem('token');
-		setProfileOpen(false);
-		setNotificationsOpen(false);
-		setPinnedMenu(null);
-		navigate('/login');
-	};
-
-	const saveProfile = async (e) => {
-		e.preventDefault();
-		setProfileSaving(true);
-		setProfileMessage('');
-		try {
-			const body = new FormData();
-			body.append('name', profileForm.name);
-			body.append('email', profileForm.email);
-			if (profileForm.password) body.append('password', profileForm.password);
-			if (profileForm.profile_image) body.append('profile_image', profileForm.profile_image);
-			const res = await axios.put('/api/auth/me', body, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			setProfile(res.data);
-			setProfileForm({ name: res.data.name || '', email: res.data.email || '', password: '', profile_image: null });
-			setEditingProfile(false);
-			setProfileMessage('Profile updated.');
-		} catch (err) {
-			setProfileMessage(err?.response?.data?.message || 'Could not update profile.');
-		} finally {
-			setProfileSaving(false);
-		}
-	};
-
-	const markNotificationRead = async (messageId) => {
-		try {
-			await axios.patch(`/api/messages/${messageId}/read`, {}, {
-				headers: { Authorization: `Bearer ${token}` }
-			});
-			setNotifications((items) => items.filter((item) => item.id !== messageId));
-			setNotificationCount((count) => Math.max(0, count - 1));
-			notify({ type: 'success', title: 'Notification read', message: 'Message notification was marked as read.' });
-		} catch {
-			notify({ type: 'error', title: 'Could not update notification', message: 'Please try again.' });
-		}
-	};
-
-	const closeHoverMenus = () => {
-		setNotificationsOpen(false);
-		setProfileOpen(false);
-		setEditingProfile(false);
-		setProfileMessage('');
-	};
-
-	const closeMenuAfterNavigation = () => {
-		setNotificationsOpen(false);
-		setPinnedMenu(null);
-	};
-
-	const closeUnpinnedMenus = () => {
-		if (!pinnedMenu) closeHoverMenus();
-	};
-
-	const profilePhoto = profileImageSrc(profile);
 
 	return (
 		<header>
@@ -270,153 +127,8 @@ function profileImageSrc(profile) {
 							<span className="brand-sub">Internal message management</span>
 						</div>
 					</Link>
-					<div className="top-nav-links" ref={navActionsRef}>
-						{token && (
-							<>
-								<div
-									className="top-nav-menu"
-									onMouseEnter={() => {
-										if (pinnedMenu) return;
-										setNotificationsOpen(true);
-										setProfileOpen(false);
-									}}
-									onMouseLeave={closeUnpinnedMenus}
-								>
-									<button
-										type="button"
-										className="icon-btn"
-										aria-label="Notifications"
-										onClick={() => {
-											const shouldOpen = pinnedMenu !== 'notifications' || !notificationsOpen;
-											setPinnedMenu(shouldOpen ? 'notifications' : null);
-											setNotificationsOpen(shouldOpen);
-											setProfileOpen(false);
-										}}
-									>
-										<Icon name="bell" />
-										{notificationCount ? <span className="notification-badge">{notificationCount}</span> : null}
-									</button>
-									{notificationsOpen ? (
-										<div className="top-popover notification-popover">
-											<div className="popover-title-row">
-												<h3>Notifications</h3>
-												<span>{notificationCount} unread</span>
-											</div>
-											{notifications.length ? (
-												<ul className="notification-list">
-													{notifications.map((msg) => (
-														<li key={msg.id}>
-															<div className="notification-card">
-																<Link to={`/messages/${msg.id}`} onClick={closeMenuAfterNavigation}>
-																	<span>{msg.subject || '(No subject)'}</span>
-																	<small>{msg.reference_number}</small>
-																</Link>
-																<button type="button" className="notification-read-btn" onClick={() => markNotificationRead(msg.id)} aria-label="Mark notification as read">
-																	<Icon name="check" />
-																</button>
-															</div>
-														</li>
-													))}
-												</ul>
-											) : (
-												<div className="popover-empty">No unread messages or system alerts.</div>
-											)}
-										</div>
-									) : null}
-								</div>
-								<div
-									className="top-nav-menu"
-									onMouseEnter={() => {
-										if (pinnedMenu) return;
-										setProfileOpen(true);
-										setNotificationsOpen(false);
-									}}
-									onMouseLeave={closeUnpinnedMenus}
-								>
-									<button
-										type="button"
-										className="icon-btn"
-										aria-label="Profile"
-										onClick={() => {
-											const shouldOpen = pinnedMenu !== 'profile' || !profileOpen;
-											setPinnedMenu(shouldOpen ? 'profile' : null);
-											setProfileOpen(shouldOpen);
-											setNotificationsOpen(false);
-											setEditingProfile(false);
-											setProfileMessage('');
-										}}
-									>
-										{profilePhoto ? (
-											<img className="profile-avatar-img" src={profilePhoto} alt="" />
-										) : (
-											<span className="profile-avatar-fallback">{getProfileInitial(profile)}</span>
-										)}
-									</button>
-									{profileOpen ? (
-										<div className="top-popover profile-popover">
-											{editingProfile ? (
-												<form className="profile-edit-form" onSubmit={saveProfile}>
-													<h3>Edit Profile</h3>
-													<input
-														type="text"
-														placeholder="Name"
-														value={profileForm.name}
-														onChange={(e) => setProfileForm((form) => ({ ...form, name: e.target.value }))}
-														required
-													/>
-													<input
-														type="email"
-														placeholder="Email"
-														value={profileForm.email}
-														onChange={(e) => setProfileForm((form) => ({ ...form, email: e.target.value }))}
-														required
-													/>
-													<input
-														type="password"
-														placeholder="New password (optional)"
-														value={profileForm.password}
-														onChange={(e) => setProfileForm((form) => ({ ...form, password: e.target.value }))}
-														autoComplete="new-password"
-													/>
-													<label className="profile-file-field">
-														<span>Profile picture</span>
-														<input
-															type="file"
-															accept="image/*"
-															onChange={(e) => setProfileForm((form) => ({ ...form, profile_image: e.target.files?.[0] || null }))}
-														/>
-													</label>
-													<div className="profile-action-row">
-														<button type="submit" disabled={profileSaving}>{profileSaving ? 'Saving...' : 'Save'}</button>
-														<button type="button" className="secondary-btn" onClick={() => setEditingProfile(false)}>Cancel</button>
-													</div>
-													{profileMessage ? <div className="profile-message">{profileMessage}</div> : null}
-												</form>
-											) : (
-												<>
-													<h3>{profile?.name || 'Current user'}</h3>
-													<p>{profile?.email || 'Email unavailable'}</p>
-													<span className="status-pill status-submitted">{profile?.role || 'user'}</span>
-													<div className="profile-action-row">
-														<button type="button" onClick={() => {
-															setProfileForm({
-																name: profile?.name || '',
-																email: profile?.email || '',
-																password: '',
-																profile_image: null
-															});
-															setEditingProfile(true);
-														}}>Edit</button>
-														<button type="button" className="profile-logout-btn" onClick={logout}>Logout</button>
-													</div>
-													{profileMessage ? <div className="profile-message">{profileMessage}</div> : null}
-												</>
-											)}
-										</div>
-									) : null}
-								</div>
-							</>
-						)}
+					<div className="top-nav-links">
+						<NavUserMenus token={token} />
 						{!token && <>
 							<NavLink className={({ isActive }) => `nav-link${isActive ? ' nav-link--active' : ''}`} to="/login">Login</NavLink>
 						</>}
@@ -437,23 +149,30 @@ function SideBar() {
 		admin: location.pathname === '/admin'
 	});
 	const [unreadInboxCount, setUnreadInboxCount] = useState(0);
-	const [unreadInboxError, setUnreadInboxError] = useState('');
-	if (!token) return null;
+	const [unreadDmCount, setUnreadDmCount] = useState(0);
 
 	useEffect(() => {
+		if (!token) {
+			return undefined;
+		}
 		let ignore = false;
 		const headers = { Authorization: `Bearer ${token}` };
 		const loadUnread = async () => {
-			try {
-				const res = await axios.get('/api/search/dashboard', { headers });
-				if (ignore) return;
-				const next = Number(res?.data?.unread) || 0;
-				setUnreadInboxCount(next);
-				setUnreadInboxError('');
-			} catch (e) {
-				if (ignore) return;
+			const [dashboardResult, dmResult] = await Promise.allSettled([
+				axios.get('/api/search/dashboard', { headers }),
+				axios.get('/api/dm/threads', { headers })
+			]);
+			if (ignore) return;
+			if (dashboardResult.status === 'fulfilled') {
+				setUnreadInboxCount(Number(dashboardResult.value?.data?.unread) || 0);
+			} else {
 				setUnreadInboxCount(0);
-				setUnreadInboxError('Unable to load unread inbox count.');
+			}
+			if (dmResult.status === 'fulfilled') {
+				const threads = Array.isArray(dmResult.value?.data) ? dmResult.value.data : [];
+				setUnreadDmCount(threads.reduce((sum, thread) => sum + (Number(thread.unread_count) || 0), 0));
+			} else {
+				setUnreadDmCount(0);
 			}
 		};
 		loadUnread();
@@ -464,49 +183,62 @@ function SideBar() {
 		};
 	}, [token]);
 
+	if (!token) return null;
+
 	const toggleGroup = (group) => {
 		setOpenGroups((groups) => ({ ...groups, [group]: !groups[group] }));
 	};
+	const messagesActive = ['/inbox', '/sent', '/drafts', '/compose'].includes(location.pathname);
+	const trackingActive = location.pathname === '/track';
+	const adminActive = location.pathname === '/admin';
 
 	return (
 		<aside className="side-nav" aria-label="Tools">
-			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/" end><Icon name="dashboard" />Dashboard</NavLink>
-			<div className={`side-nav-group${openGroups.messages ? ' side-nav-group--open' : ''}`}>
-				<button type="button" className="side-nav-link side-nav-group-trigger" onClick={() => toggleGroup('messages')} aria-expanded={openGroups.messages}>
-					<span><Icon name="inbox" />Messages</span>
-					<Icon name="chevron" />
-				</button>
-					<div className="side-nav-submenu">
-						<NavLink
-							className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`}
-							to="/inbox"
-						>
-							<Icon name="inbox" />Inbox
-							{unreadInboxCount > 0 ? <span className="inbox-unread-badge">{unreadInboxCount}</span> : null}
-						</NavLink>
-						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/sent"><Icon name="sent" />Sent</NavLink>
-						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/drafts"><Icon name="drafts" />Drafts</NavLink>
-						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/compose"><Icon name="compose" />Compose</NavLink>
-					</div>
+			<div className="side-nav-site">
+				<img className="side-nav-site-logo" src={APP_LOGO} alt="" width={40} height={40} />
+				<div className="side-nav-site-text">
+					<span className="side-nav-site-title">Lideta Center</span>
+					<span className="side-nav-site-sub">MESOB IMMS</span>
+				</div>
 			</div>
-			<div className={`side-nav-group${openGroups.tracking ? ' side-nav-group--open' : ''}`}>
-				<button type="button" className="side-nav-link side-nav-group-trigger" onClick={() => toggleGroup('tracking')} aria-expanded={openGroups.tracking}>
-					<span><Icon name="track" />Tracking</span>
+			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/" end><Icon name="dashboard" /><span className="side-nav-label">Dashboard</span></NavLink>
+			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/dm"><Icon name="chat" /><span className="side-nav-label">Chat</span>{unreadDmCount > 0 ? <span className="inbox-unread-badge">{unreadDmCount}</span> : null}</NavLink>
+			<div className={`side-nav-group${openGroups.messages ? ' side-nav-group--open' : ''}`}>
+				<button type="button" className={`side-nav-link side-nav-group-trigger${messagesActive ? ' side-nav-link--active-parent' : ''}`} onClick={() => toggleGroup('messages')} aria-expanded={openGroups.messages}>
+					<span><Icon name="inbox" /><span className="side-nav-label">Messages</span></span>
 					<Icon name="chevron" />
 				</button>
 				<div className="side-nav-submenu">
-					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/track"><Icon name="track" />Track Messages</NavLink>
+					<NavLink
+						className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`}
+						to="/inbox"
+					>
+						<Icon name="inbox" /><span className="side-nav-label">Inbox</span>
+						{unreadInboxCount > 0 ? <span className="inbox-unread-badge">{unreadInboxCount}</span> : null}
+					</NavLink>
+					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/sent"><Icon name="sent" /><span className="side-nav-label">Sent</span></NavLink>
+					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/drafts"><Icon name="drafts" /><span className="side-nav-label">Drafts</span></NavLink>
+					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/compose"><Icon name="compose" /><span className="side-nav-label">Compose</span></NavLink>
+				</div>
+			</div>
+			<div className={`side-nav-group${openGroups.tracking ? ' side-nav-group--open' : ''}`}>
+				<button type="button" className={`side-nav-link side-nav-group-trigger${trackingActive ? ' side-nav-link--active-parent' : ''}`} onClick={() => toggleGroup('tracking')} aria-expanded={openGroups.tracking}>
+					<span><Icon name="track" /><span className="side-nav-label">Tracking</span></span>
+					<Icon name="chevron" />
+				</button>
+				<div className="side-nav-submenu">
+					<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive ? ' side-nav-link--active' : ''}`} to="/track"><Icon name="track" /><span className="side-nav-label">Track Messages</span></NavLink>
 				</div>
 			</div>
 			{isAdmin ? (
 				<div className={`side-nav-group${openGroups.admin ? ' side-nav-group--open' : ''}`}>
-					<button type="button" className="side-nav-link side-nav-group-trigger" onClick={() => toggleGroup('admin')} aria-expanded={openGroups.admin}>
-						<span><Icon name="admin" />Admin</span>
+					<button type="button" className={`side-nav-link side-nav-group-trigger${adminActive ? ' side-nav-link--active-parent' : ''}`} onClick={() => toggleGroup('admin')} aria-expanded={openGroups.admin}>
+						<span><Icon name="admin" /><span className="side-nav-label">Admin</span></span>
 						<Icon name="chevron" />
 					</button>
 					<div className="side-nav-submenu">
-						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive && location.search !== '?section=departments' ? ' side-nav-link--active' : ''}`} to="/admin?section=users"><Icon name="users" />Users</NavLink>
-						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive && location.search === '?section=departments' ? ' side-nav-link--active' : ''}`} to="/admin?section=departments"><Icon name="departments" />Departments</NavLink>
+						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive && location.search !== '?section=departments' ? ' side-nav-link--active' : ''}`} to="/admin?section=users"><Icon name="users" /><span className="side-nav-label">Users</span></NavLink>
+						<NavLink className={({ isActive }) => `side-nav-link side-nav-sublink${isActive && location.search === '?section=departments' ? ' side-nav-link--active' : ''}`} to="/admin?section=departments"><Icon name="departments" /><span className="side-nav-label">Departments</span></NavLink>
 					</div>
 				</div>
 			) : null}
@@ -517,6 +249,20 @@ function SideBar() {
 function AppLayout() {
 	const location = useLocation();
 	const authRoute = location.pathname === '/login' || location.pathname === '/register';
+	const [pageEnter, setPageEnter] = useState(false);
+
+	useEffect(() => {
+		if (authRoute) return undefined;
+		if (sessionStorage.getItem(LOGIN_ENTRANCE_KEY) !== '1') return undefined;
+		sessionStorage.removeItem(LOGIN_ENTRANCE_KEY);
+		const start = window.setTimeout(() => setPageEnter(true), 0);
+		const end = window.setTimeout(() => setPageEnter(false), 900);
+		return () => {
+			window.clearTimeout(start);
+			window.clearTimeout(end);
+		};
+	}, [authRoute, location.pathname]);
+
 	return (
 		<>
 			{!authRoute ? <NavBar /> : null}
@@ -529,17 +275,21 @@ function AppLayout() {
 				) : (
 					<div className="app-shell">
 						<SideBar />
-						<div className="app-content">
+						<div className={`app-content${pageEnter ? ' app-content--enter' : ''}`}>
 							<Routes>
 								<Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
 								<Route path="/inbox" element={<PrivateRoute><InboxPage /></PrivateRoute>} />
 								<Route path="/sent" element={<PrivateRoute><SentPage /></PrivateRoute>} />
 								<Route path="/drafts" element={<PrivateRoute><DraftsPage /></PrivateRoute>} />
+								<Route path="/dm" element={<PrivateRoute><DMInboxPage /></PrivateRoute>} />
+								<Route path="/dm/:otherUserId" element={<PrivateRoute><DMChatPage /></PrivateRoute>} />
 								<Route path="/track" element={<PrivateRoute><TrackMessagePage /></PrivateRoute>} />
 								<Route path="/compose" element={<PrivateRoute><ComposeMessagePage /></PrivateRoute>} />
-								<Route path="/messages/:id" element={<PrivateRoute><MessageDetailPage /></PrivateRoute>} />
-								<Route path="/admin" element={<PrivateRoute><AdminRoute><AdminPanelPage /></AdminRoute></PrivateRoute>} />
-							</Routes>
+											<Route path="/messages/:id" element={<PrivateRoute><MessageDetailPage /></PrivateRoute>} />
+											<Route path="/admin" element={<PrivateRoute><AdminRoute><AdminPanelPage /></AdminRoute></PrivateRoute>} />
+										</Routes>
+
+
 						</div>
 					</div>
 				)}

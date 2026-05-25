@@ -185,8 +185,8 @@ export default function AdminPanelPage() {
 
       <div className="admin-stats-grid">
         <div className="admin-stat-card"><span>Total Users</span><strong>{users.length}</strong></div>
-        <div className="admin-stat-card"><span>Admins</span><strong>{adminCount}</strong></div>
-        <div className="admin-stat-card"><span>Staff</span><strong>{staffCount}</strong></div>
+        <div className="admin-stat-card admin-stat-card--admin"><span>Admins</span><strong>{adminCount}</strong></div>
+        <div className="admin-stat-card admin-stat-card--staff"><span>Staff</span><strong>{staffCount}</strong></div>
         <div className="admin-stat-card"><span>Departments</span><strong>{departments.length}</strong></div>
       </div>
 

@@ -25,7 +25,7 @@ export default function MessageDetailPage() {
   const [isForwarding, setIsForwarding] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
-  const token = sessionStorage.getItem('token') || localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
   const visibleHistory = useMemo(() => {
     const forwardedChildren = new Set(
@@ -33,11 +33,23 @@ export default function MessageDetailPage() {
         .filter((evt) => evt.event_type === 'forwarded' && evt.parent_message_id)
         .map((evt) => `${evt.parent_message_id}:${evt.actor_id || ''}:${evt.note || ''}`)
     );
-    return history.filter((evt) => {
+
+    const filtered = history.filter((evt) => {
       if (evt.event_type !== 'forwarded' || evt.parent_message_id) return true;
       return !forwardedChildren.has(`${evt.message_id}:${evt.actor_id || ''}:${evt.note || ''}`);
     });
+
+    // Show only the last 2 events (most recent by created_at, then id fallback).
+    return [...filtered]
+      .sort((a, b) => {
+        const at = new Date(a.created_at || 0).getTime();
+        const bt = new Date(b.created_at || 0).getTime();
+        if (bt !== at) return bt - at;
+        return (b.id || 0) - (a.id || 0);
+      })
+      .slice(0, 2);
   }, [history]);
+
 
   const loadMessage = useCallback(async () => {
     const res = await axios.get(`/api/messages/${id}`, { headers: authHeaders });
@@ -201,7 +213,7 @@ export default function MessageDetailPage() {
         )}
       </div>
       <section className="message-document-wrap" aria-label="Formatted letter">
-        <LetterRenderer html={message.formatted_content} fallback={message.raw_content || message.content} />
+<LetterRenderer html={message.formatted_content} fallback={message.raw_content || message.content} />
       </section>
 
       {message.status === 'draft' && (
