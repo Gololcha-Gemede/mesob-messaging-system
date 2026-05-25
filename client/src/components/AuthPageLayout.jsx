@@ -57,22 +57,24 @@ export function AuthInputRow({ icon = 'user', children, className = '' }) {
 /**
  * Layout matched to QMS MESOB login (http://10.10.41.70/login): fullscreen photo + overlay, blue two-column card.
  */
-export default function AuthPageLayout({ title, subtitle, children, footerLink }) {
+export default function AuthPageLayout({ title, subtitle, children, footerLink, className = '' }) {
   return (
-    <div className="auth-fullscreen">
+    <div className={['auth-fullscreen', className].filter(Boolean).join(' ')}>
       <div className="auth-panel" role="region" aria-label={title}>
         <div className="auth-panel-brand">
-          <img
-            className="auth-panel-logo"
-            src={QMS_LOGO}
-            alt="MESOB"
-            width={200}
-            height={200}
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-          <p className="auth-panel-tagline">Internal Message Management · MESOB</p>
+          <div className="auth-panel-logo-wrap" aria-hidden="true">
+            <img
+              className="auth-panel-logo"
+              src={QMS_LOGO}
+              alt=""
+              width={200}
+              height={200}
+              onError={(e) => {
+                e.currentTarget.closest('.auth-panel-logo-wrap')?.style.setProperty('display', 'none');
+              }}
+            />
+          </div>
+          <p className="auth-panel-tagline">Internal Message Management - MESOB</p>
         </div>
         <div className="auth-panel-form">
           <h1 className="auth-title">{title}</h1>

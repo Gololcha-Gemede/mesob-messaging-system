@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { notify } from '../utils/notify';
@@ -13,6 +13,7 @@ export default function DraftsPage() {
   const [messages, setMessages] = useState([]);
   const [filterValue, setFilterValue] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -27,12 +28,13 @@ export default function DraftsPage() {
       setError('');
       axios
         .get(`/api/messages/drafts${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}` }
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
         })
         .then((res) => {
           if (ignore) return;
           setMessages(Array.isArray(res.data) ? res.data : []);
           setSelectedIds([]);
+          setPage(1);
         })
         .catch((err) => {
           if (ignore) return;
@@ -53,6 +55,14 @@ export default function DraftsPage() {
     return loadDrafts();
   }, [loadDrafts]);
 
+  const pageSize = 8;
+  const totalPages = Math.max(1, Math.ceil(messages.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const visibleMessages = useMemo(
+    () => messages.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [messages, currentPage]
+  );
+
   const toggleSelected = (id) => {
     setSelectedIds((ids) => ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]);
   };
@@ -63,7 +73,7 @@ export default function DraftsPage() {
     setError('');
     try {
       await axios.delete('/api/messages/drafts', {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem('token') || localStorage.getItem('token')}` },
+          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
         data: { ids }
       });
       setMessages((items) => items.filter((msg) => !ids.includes(msg.id)));
@@ -111,8 +121,12 @@ export default function DraftsPage() {
       {error ? <div className="error banner-message">{error}</div> : null}
       {loading ? <div className="list-state">Loading drafts...</div> : null}
       <ul className="message-list">
-        {!loading && messages.map((msg) => (
-          <li key={msg.id} className="message-item draft-message-item">
+        {!loading && visibleMessages.map((msg, index) => (
+          <li
+            key={msg.id}
+            className="message-item message-item--draft draft-message-item"
+            style={{ animationDelay: `${Math.min(index, 12) * 0.04}s` }}
+          >
             <label className="draft-select">
               <input
                 type="checkbox"
@@ -121,13 +135,13 @@ export default function DraftsPage() {
                 aria-label={`Select draft ${msg.subject || msg.id}`}
               />
             </label>
-            <Link to={`/messages/${msg.id}`} className="draft-message-link">
-              <div>
+            <Link to={`/messages/${msg.id}`} className="message-item-row draft-message-link">
+              <div className="message-item-content">
                 <div className="message-item-title">{msg.subject || '(No subject)'}</div>
                 <div className="message-item-meta">
                   <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
-                  <span>Last Edited {formatDate(msg.created_at || msg.submitted_at)}</span>
-                  {msg.file_path ? <span className="attachment-indicator">Attachment</span> : null}
+                  {msg.file_path ? <span className="attachment-indicator">📎</span> : null}
+                  <span className="message-date">Edited {formatDate(msg.created_at || msg.submitted_at)}</span>
                 </div>
               </div>
             </Link>
@@ -142,6 +156,13 @@ export default function DraftsPage() {
           </li>
         ))}
       </ul>
+      {!loading && totalPages > 1 ? (
+        <div className="pagination-row">
+          <button type="button" className="secondary-btn" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))}>Previous</button>
+          <span>Page {currentPage} of {totalPages}</span>
+          <button type="button" className="secondary-btn" disabled={currentPage >= totalPages} onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>Next</button>
+        </div>
+      ) : null}
       {!loading && !messages.length ? (
         <div className="empty-state">No drafts found.</div>
       ) : null}

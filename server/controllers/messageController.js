@@ -5,6 +5,8 @@ const pool = require('../models/db');
 const { generateLetterHtml, getTemplateOptions, normalizeTemplateType } = require('../services/letterFormatter');
 const { withLockedReference } = require('../services/referenceService');
 const { generateLetterPdf } = require('../services/pdfService');
+const { audit } = require('../utils/audit');
+const { validateUploadedFile } = require('../utils/uploadSecurity');
 
 async function getUserDepartmentId(userId) {
   const [[row]] = await pool.query('SELECT department_id FROM users WHERE id = ?', [userId]);
@@ -74,10 +76,6 @@ function previewAttachmentMetadata(body) {
   }];
 }
 
-function signaturePath(user) {
-  return user?.signature_image_path || user?.profile_image_path || '';
-}
-
 function buildLetterPayload({
   template_type,
   reference_number,
@@ -98,7 +96,7 @@ function buildLetterPayload({
     subject: subject || '(No subject)',
     body: content || '',
     attachments,
-    signatureImagePath: signaturePath(sender),
+    signatureImagePath: '',
     logoUrl: '/qms-logo.png'
   };
 }
@@ -132,9 +130,13 @@ exports.sendMessage = async (req, res) => {
     const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, template_type, sender_name } = req.body;
     const sender_id = req.user.id;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
+    const senderNameTrimmed = typeof sender_name === 'string' ? sender_name.trim() : '';
     const effectiveDepartmentId = req.user.department_id || department_id || await getUserDepartmentId(sender_id);
     if (!effectiveDepartmentId) {
       return res.status(400).json({ message: 'Department is required to send a message' });
+    }
+    if (!senderNameTrimmed) {
+      return res.status(400).json({ message: 'Sender name is required' });
     }
 
     const normalizedAction = action === 'draft' ? 'draft' : 'submit';
@@ -148,7 +150,10 @@ exports.sendMessage = async (req, res) => {
     }
 
     const status = normalizedAction === 'draft' ? 'draft' : 'delivered';
+    const uploadError = await validateUploadedFile(req.file, { allowPdf: true, allowImages: true });
+    if (uploadError) return res.status(400).json({ message: uploadError });
     const sender = await userModel.findById(sender_id);
+    const senderForLetter = { ...sender, name: senderNameTrimmed };
     const attachmentFields = fileMetadata(req.file);
     // Note: actual file metadata is stored on the message (file_path/file_name/etc.)
     // but attachments are not rendered inside the letter HTML.
@@ -166,14 +171,14 @@ exports.sendMessage = async (req, res) => {
         raw_content: content || '',
         content: content || '',
         template_type: normalizeTemplateType(template_type),
-        sender_name,
+        sender_name: senderNameTrimmed,
         status,
 
         ...attachmentFields,
         department_id: effectiveDepartmentId,
         due_date: due_date || null
       }, {
-        sender,
+        sender: senderForLetter,
         receiver,
         attachments: [],
         shouldGeneratePdf: normalizedAction === 'submit'
@@ -200,6 +205,10 @@ exports.sendMessage = async (req, res) => {
       reference_number: createdMessages[0]?.reference_number,
       messages: createdMessages
     });
+    audit(normalizedAction === 'draft' ? 'draft_created' : 'message_sent', req, {
+      message_ids: createdMessages.map((message) => message.id),
+      receiver_ids: selectedReceiverIds
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error sending message', error: err.message });
   }
@@ -209,6 +218,10 @@ exports.previewMessage = async (req, res) => {
   try {
     const { receiver_id, receiver_ids, subject, content, template_type, sender_name } = req.body;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
+    const senderNameTrimmed = typeof sender_name === 'string' ? sender_name.trim() : '';
+    if (!senderNameTrimmed) {
+      return res.status(400).json({ message: 'Sender name is required' });
+    }
     const sender = await userModel.findById(req.user.id);
 
     const receiver = selectedReceiverIds[0] ? await userModel.findById(selectedReceiverIds[0]) : null;
@@ -218,7 +231,7 @@ exports.previewMessage = async (req, res) => {
       reference_number,
       sender: {
         ...sender,
-        name: typeof sender_name === 'string' && sender_name.trim() ? sender_name.trim() : sender?.name
+        name: senderNameTrimmed
       },
       receiver,
       subject: subject || '(No subject)',
@@ -243,7 +256,8 @@ exports.getInbox = async (req, res) => {
   try {
     const subject = typeof req.query.subject === 'string' ? req.query.subject : '';
     const reference = typeof req.query.reference === 'string' ? req.query.reference : '';
-    const messages = await messageModel.getInbox(req.user.id, { subject, reference });
+    const status = typeof req.query.status === 'string' ? req.query.status : '';
+    const messages = await messageModel.getInbox(req.user.id, { subject, reference, status });
     res.json(messages);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching inbox', error: err.message });
@@ -379,11 +393,12 @@ exports.submitDraft = async (req, res) => {
     if (!message.receiver_id) return res.status(400).json({ message: 'Cannot submit draft without a receiver' });
 
     const sender = await userModel.findById(message.sender_id);
+    const senderForLetter = { ...sender, name: message.sender_name || sender?.name };
     const receiver = await userModel.findById(message.receiver_id);
     const letterPayload = buildLetterPayload({
       template_type: message.template_type,
       reference_number: message.reference_number,
-      sender,
+      sender: senderForLetter,
       receiver,
       subject: message.subject,
       content: message.raw_content || message.content,
@@ -408,6 +423,7 @@ exports.submitDraft = async (req, res) => {
       to_status: 'delivered'
     });
     res.json({ message: 'Draft submitted' });
+    audit('draft_submitted', req, { message_id: Number(id) });
   } catch (err) {
     res.status(500).json({ message: 'Error submitting draft', error: err.message });
   }
@@ -468,6 +484,10 @@ exports.forwardMessage = async (req, res) => {
     }
 
     res.json({ id: forwardedMessages[0]?.id, messages: forwardedMessages });
+    audit('message_forwarded', req, {
+      original_message_id: Number(id),
+      message_ids: forwardedMessages.map((message) => message.id)
+    });
   } catch (err) {
     res.status(500).json({ message: 'Error forwarding message', error: err.message });
   }
@@ -484,6 +504,7 @@ exports.downloadAttachment = async (req, res) => {
       event_type: 'attachment_downloaded',
       actor_id: req.user.id
     });
+    audit('attachment_downloaded', req, { message_id: Number(id) });
     res.download(message.file_path);
   } catch (err) {
     res.status(500).json({ message: 'Error downloading attachment', error: err.message });
@@ -500,11 +521,12 @@ exports.downloadPdf = async (req, res) => {
     let pdfPath = message.pdf_path;
     if (!pdfPath) {
       const sender = await userModel.findById(message.sender_id);
+      const senderForLetter = { ...sender, name: message.sender_name || sender?.name };
       const receiver = message.receiver_id ? await userModel.findById(message.receiver_id) : null;
       const letterPayload = buildLetterPayload({
         template_type: message.template_type,
         reference_number: message.reference_number,
-        sender,
+        sender: senderForLetter,
         receiver,
         subject: message.subject,
         content: message.raw_content || message.content,
@@ -522,6 +544,7 @@ exports.downloadPdf = async (req, res) => {
       event_type: 'pdf_downloaded',
       actor_id: req.user.id
     });
+    audit('pdf_downloaded', req, { message_id: Number(id) });
     res.download(pdfPath, `${message.reference_number || `message-${id}`}.pdf`);
   } catch (err) {
     res.status(500).json({ message: 'Error downloading PDF', error: err.message });

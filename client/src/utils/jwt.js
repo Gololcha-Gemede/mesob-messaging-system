@@ -13,3 +13,4 @@ export function roleFromToken(token) {
 }
 
 export const ADMIN_REGISTER_SESSION_KEY = 'imms_from_admin_register';
+export const LOGIN_ENTRANCE_KEY = 'imms_just_logged_in';

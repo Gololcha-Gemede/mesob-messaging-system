@@ -1,10 +1,13 @@
 const pool = require('./db');
+const DM_ONLY_M = "m.template_type = 'direct_message'";
 
 module.exports = {
+  DM_ONLY_M,
   async create(message) {
     const {
       sender_id,
       receiver_id,
+      sender_name = null,
       subject,
       content,
       raw_content = content || '',
@@ -22,13 +25,14 @@ module.exports = {
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, subject, content, raw_content, formatted_content, template_type,
+        sender_id, receiver_id, sender_name, subject, content, raw_content, formatted_content, template_type,
         reference_number, status, file_path, file_name, file_mime, file_size, pdf_path,
         department_id, due_date, submitted_at, delivered_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         sender_id,
         receiver_id,
+        sender_name,
         subject,
         raw_content,
         raw_content,
@@ -61,6 +65,15 @@ module.exports = {
     if (reference) {
       sql += ' AND reference_number LIKE ?';
       params.push(`%${reference}%`);
+    }
+    const status = typeof filters.status === 'string' ? filters.status.trim() : '';
+    if (status === 'read') {
+      sql += ' AND read_at IS NOT NULL';
+    } else if (status === 'unread') {
+      sql += ' AND read_at IS NULL';
+    } else if (status) {
+      sql += ' AND status = ?';
+      params.push(status);
     }
     sql += ' ORDER BY id DESC';
     const [rows] = await pool.query(sql, params);
@@ -128,7 +141,8 @@ module.exports = {
   },
   async countUnreadForUser(userId) {
     const [[{ count }]] = await pool.query(
-      "SELECT COUNT(*) as count FROM messages WHERE receiver_id = ? AND status <> 'draft' AND read_at IS NULL",
+      `SELECT COUNT(*) as count FROM messages
+       WHERE receiver_id = ? AND status <> 'draft' AND read_at IS NULL`,
       [userId]
     );
     return count;
@@ -354,5 +368,11 @@ module.exports = {
     );
     return rows[0];
   },
-  
+  async incrementViewCount(messageId) {
+    const [result] = await pool.query(
+      `UPDATE messages SET view_count = view_count + 1 WHERE id = ?`,
+      [messageId]
+    );
+    return result.affectedRows > 0;
+  },
 };

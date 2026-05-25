@@ -1,6 +1,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user');
+const { validatePassword } = require('../utils/passwordPolicy');
+const { audit } = require('../utils/audit');
+const { validateUploadedFile } = require('../utils/uploadSecurity');
 require('dotenv').config();
 
 function uploadedProfilePath(file) {
@@ -10,10 +13,17 @@ function uploadedProfilePath(file) {
 exports.login = async (req, res) => {
   const { email, password } = req.body;
   const user = await userModel.findByEmail(email);
-  if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+  if (!user) {
+    audit('login_failed', req, { email: String(email || '').toLowerCase(), reason: 'unknown_user' });
+    return res.status(400).json({ message: 'Invalid credentials' });
+  }
   const valid = await bcrypt.compare(password, user.password);
-  if (!valid) return res.status(400).json({ message: 'Invalid credentials' });
+  if (!valid) {
+    audit('login_failed', req, { user_id: user.id, reason: 'bad_password' });
+    return res.status(400).json({ message: 'Invalid credentials' });
+  }
   const token = jwt.sign({ id: user.id, role: user.role, department_id: user.department_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+  audit('login_success', req, { user_id: user.id });
   res.json({
     token,
     user: {
@@ -26,6 +36,46 @@ exports.login = async (req, res) => {
       signature_image_path: user.signature_image_path
     }
   });
+};
+
+exports.register = async (req, res) => {
+  try {
+    if (process.env.ALLOW_PUBLIC_REGISTER !== 'true') {
+      return res.status(403).json({
+        message: 'Public registration is disabled. Contact an administrator to create an account.'
+      });
+    }
+    const name = typeof req.body.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const password = typeof req.body.password === 'string' ? req.body.password : '';
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    const passwordError = validatePassword(password);
+    if (passwordError) return res.status(400).json({ message: passwordError });
+
+    const existing = await userModel.findByEmail(email);
+    if (existing) return res.status(400).json({ message: 'Email already in use' });
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = await userModel.create({
+      name,
+      email,
+      password: hashedPassword,
+      role: 'user',
+      department_id: null,
+      profile_image_path: uploadedProfilePath(req.file) || null
+    });
+    audit('user_registered', req, { user_id: userId, email });
+
+    res.status(201).json({
+      id: userId,
+      message: 'Account created. An administrator can update your access level if needed.'
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Error creating account', error: err.message });
+  }
 };
 
 exports.me = async (req, res) => {
@@ -62,6 +112,10 @@ exports.updateMe = async (req, res) => {
 
     const dup = await userModel.countByEmailExceptId(email, req.user.id);
     if (dup > 0) return res.status(400).json({ message: 'Email already in use' });
+    const passwordError = validatePassword(password, { required: false });
+    if (passwordError) return res.status(400).json({ message: passwordError });
+    const uploadError = await validateUploadedFile(req.file, { allowPdf: false, allowImages: true });
+    if (uploadError) return res.status(400).json({ message: uploadError });
 
     const payload = {
       name,
@@ -74,6 +128,7 @@ exports.updateMe = async (req, res) => {
     const profileImagePath = uploadedProfilePath(req.file);
     if (profileImagePath !== undefined) payload.profile_image_path = profileImagePath;
     await userModel.update(req.user.id, payload);
+    audit('profile_updated', req, { user_id: req.user.id });
 
     res.json({
       id: user.id,

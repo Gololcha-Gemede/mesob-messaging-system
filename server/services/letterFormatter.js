@@ -15,6 +15,55 @@ function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+function sanitizeUrl(value) {
+  const clean = String(value || '').trim();
+  if (/^(https?:|mailto:|tel:|#)/i.test(clean)) return clean;
+  return '';
+}
+
+function sanitizeRichHtml(value) {
+  const input = String(value || '');
+  const allowedTags = new Set(['p', 'div', 'br', 'b', 'strong', 'i', 'em', 'u', 'ol', 'ul', 'li', 'a']);
+  let output = '';
+  let cursor = 0;
+  const tagRegex = /<\/?([a-z][a-z0-9]*)\b[^>]*>/gi;
+
+  for (const match of input.matchAll(tagRegex)) {
+    output += escapeHtml(input.slice(cursor, match.index));
+    cursor = match.index + match[0].length;
+
+    const tag = match[1].toLowerCase();
+    if (!allowedTags.has(tag)) continue;
+
+    const isClosing = /^<\//.test(match[0]);
+    if (tag === 'br') {
+      if (!isClosing) output += '<br>';
+      continue;
+    }
+
+    if (isClosing) {
+      output += `</${tag}>`;
+      continue;
+    }
+
+    if (tag === 'a') {
+      const hrefMatch = match[0].match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const href = sanitizeUrl(hrefMatch?.[2] || hrefMatch?.[3] || hrefMatch?.[4] || '');
+      output += href ? `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer">` : '<a>';
+      continue;
+    }
+
+    output += `<${tag}>`;
+  }
+
+  output += escapeHtml(input.slice(cursor));
+  return output
+    .replace(/<div><br><\/div>/gi, '<p>&nbsp;</p>')
+    .replace(/<div>/gi, '<p>')
+    .replace(/<\/div>/gi, '</p>')
+    .trim();
+}
+
 function formatDate(value = new Date()) {
   const date = value instanceof Date ? value : new Date(value);
   return date.toLocaleDateString('en-US', {
@@ -27,6 +76,7 @@ function formatDate(value = new Date()) {
 function paragraphsFromContent(content) {
   const clean = String(content || '').trim();
   if (!clean) return '<p>&nbsp;</p>';
+  if (/<[^>]+>/.test(clean)) return `<div class="rich-content">${sanitizeRichHtml(clean)}</div>`;
   return clean
     .split(/\n{2,}/)
     .map((paragraph) => `<p>${escapeHtml(paragraph).replace(/\n/g, '<br>')}</p>`)
@@ -53,12 +103,8 @@ function attachmentRows(attachments = []) {
 
 function signatureBlock(data) {
   const title = data.senderTitle ? `<span>${escapeHtml(data.senderTitle)}</span>` : '';
-  const signature = data.signatureImagePath
-    ? `<img class="letter-signature-image" src="${escapeHtml(data.signatureImagePath)}" alt="">`
-    : '';
   return `
     <section class="letter-signature">
-      ${signature}
       <strong>${escapeHtml(data.senderName)}</strong>
       ${title}
     </section>

@@ -8,6 +8,8 @@ node_modules
 dist
 build
 server/generated-pdfs
+server/uploads/*
+!server/uploads/.gitkeep
 
 # logs
 *.log
