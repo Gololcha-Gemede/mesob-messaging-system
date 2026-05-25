@@ -101,6 +101,7 @@ export default function InboxPage() {
 
       {error ? <div className="error banner-message">{error}</div> : null}
       {loading ? <div className="list-state">Loading messages...</div> : null}
+<<<<<<< HEAD
 
       {!loading && messages.length > 0 && (
         <div className="inbox-section">
@@ -137,6 +138,25 @@ export default function InboxPage() {
         </div>
       )}
 
+=======
+      <ul className="message-list">
+        {!loading && messages.map((msg) => (
+          <li key={msg.id} className="message-item">
+            <Link to={`/messages/${msg.id}`}>
+              <div className="message-item-title">{msg.subject || '(No subject)'}</div>
+              <div className="message-item-meta">
+                <span>{msg.reference_number}</span>
+                <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
+                {msg.read_at ? <span className="message-state message-state--read">Read</span> : <span className="message-state message-state--unread">Unread</span>}
+                {msg.is_formal_letter ? <span className="letter-indicator">Formal Letter</span> : null}
+                {msg.file_path ? <span className="attachment-indicator">Attachment</span> : null}
+                {msg.due_date ? <span className="priority-label">Priority</span> : null}
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+>>>>>>> 7a6550326a5418a57d8f86b5902e1d9a15ca9bc1
       {!loading && !messages.length ? (
         <div className="empty-state">📭 No inbox messages found.</div>
       ) : null}

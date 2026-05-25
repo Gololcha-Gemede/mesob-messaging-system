@@ -21,7 +21,10 @@ module.exports = {
       file_size = null,
       pdf_path = null,
       department_id,
-      due_date = null
+      due_date = null,
+      is_formal_letter = 0,
+      letter_html = null,
+      pdf_path = null
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (

@@ -85,6 +85,7 @@ export default function SentPage() {
       {error ? <div className="error banner-message">{error}</div> : null}
       {loading ? <div className="list-state">Loading sent messages...</div> : null}
       <ul className="message-list">
+<<<<<<< HEAD
         {!loading && visibleMessages.map((msg, index) => (
           <li
             key={msg.id}
@@ -105,6 +106,20 @@ export default function SentPage() {
                   {msg.file_path ? <span className="attachment-indicator">📎</span> : null}
                   <span className="message-date">{formatDate(msg.submitted_at || msg.created_at)}</span>
                 </div>
+=======
+        {!loading && messages.map((msg) => (
+          <li key={msg.id} className="message-item">
+            <Link to={`/messages/${msg.id}`}>
+              <div className="message-item-title">{msg.subject || '(No subject)'}</div>
+              <div className="message-item-meta">
+                <span>{msg.reference_number}</span>
+                <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
+                <span className="message-state message-state--sent">Sent</span>
+                {msg.read_at ? <span className="message-state message-state--read">Read</span> : <span className="message-state message-state--delivered">Delivered</span>}
+                {msg.is_formal_letter ? <span className="letter-indicator">Formal Letter</span> : null}
+                {msg.file_path ? <span className="attachment-indicator">Attachment</span> : null}
+                {msg.due_date ? <span className="priority-label">Priority</span> : null}
+>>>>>>> 7a6550326a5418a57d8f86b5902e1d9a15ca9bc1
               </div>
             </Link>
           </li>
