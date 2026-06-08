@@ -8,6 +8,12 @@ function uploadedProfilePath(file) {
   return file?.filename ? `/uploads/${file.filename}` : null;
 }
 
+function normalizeRole(role) {
+  if (role === 'admin') return 'admin';
+  if (role === 'manager') return 'manager';
+  return 'user';
+}
+
 exports.createUser = async (req, res) => {
   try {
     const { name, email, password, role, department_id } = req.body;
@@ -18,7 +24,9 @@ exports.createUser = async (req, res) => {
     if (passwordError) return res.status(400).json({ message: passwordError });
     const uploadError = await validateUploadedFile(req.file, { allowPdf: false, allowImages: true });
     if (uploadError) return res.status(400).json({ message: uploadError });
-    const normalizedRole = role === 'admin' ? 'admin' : 'user';
+    const existing = await userModel.findByEmail(email);
+    if (existing) return res.status(400).json({ message: 'Email already in use' });
+    const normalizedRole = normalizeRole(role);
     const hashedPassword = await bcrypt.hash(password, 10);
     const userId = await userModel.create({
       name,
@@ -31,6 +39,9 @@ exports.createUser = async (req, res) => {
     audit('admin_created_user', req, { user_id: userId, role: normalizedRole });
     res.status(201).json({ id: userId });
   } catch (err) {
+    if (err.code === 'WARN_DATA_TRUNCATED' || err.code === 'ER_TRUNCATED_WRONG_VALUE_FOR_FIELD') {
+      return res.status(500).json({ message: 'Database role column is not ready for manager users. Restart the server so schema initialization can update the users role column.' });
+    }
     res.status(500).json({ message: 'Error creating user', error: err.message });
   }
 };
@@ -56,7 +67,8 @@ exports.updateUser = async (req, res) => {
     if (!existing) return res.status(404).json({ message: 'User not found' });
     const dup = await userModel.countByEmailExceptId(email, id);
     if (dup > 0) return res.status(400).json({ message: 'Email already in use' });
-    const payload = { name, email, role, department_id };
+    const normalizedRole = normalizeRole(role);
+    const payload = { name, email, role: normalizedRole, department_id };
     if (password && String(password).trim()) {
       const cleanPassword = String(password).trim();
       const passwordError = validatePassword(cleanPassword, { required: false });
@@ -64,7 +76,7 @@ exports.updateUser = async (req, res) => {
       payload.password = await bcrypt.hash(cleanPassword, 10);
     }
     await userModel.update(id, payload);
-    audit('admin_updated_user', req, { user_id: id, role });
+    audit('admin_updated_user', req, { user_id: id, role: normalizedRole });
     res.json({ message: 'User updated' });
   } catch (err) {
     res.status(500).json({ message: 'Error updating user', error: err.message });

@@ -147,7 +147,7 @@ module.exports = {
     );
     return count;
   },
-  async getAllForAdmin(userId) {
+  async getAllForManager(userId) {
     const [rows] = await pool.query(
       `SELECT m.id, m.subject, m.reference_number, m.status, m.sender_id, m.receiver_id,
               m.submitted_at, m.read_at, m.created_at,
@@ -161,7 +161,7 @@ module.exports = {
     );
     return rows;
   },
-  async track({ userId, role, reference, subject }) {
+  async track({ userId, role, reference, subject, dateFrom, dateTo }) {
     const cleanReference = typeof reference === 'string' ? reference.trim() : '';
     const cleanSubject = typeof subject === 'string' ? subject.trim() : '';
     const matchClauses = [];
@@ -174,6 +174,14 @@ module.exports = {
     if (cleanSubject) {
       matchClauses.push('subject LIKE ?');
       matchParams.push(`%${cleanSubject}%`);
+    }
+    if (dateFrom) {
+      matchClauses.push('DATE(COALESCE(submitted_at, created_at)) >= ?');
+      matchParams.push(dateFrom);
+    }
+    if (dateTo) {
+      matchClauses.push('DATE(COALESCE(submitted_at, created_at)) <= ?');
+      matchParams.push(dateTo);
     }
 
     const whereMatch = matchClauses.length ? matchClauses.join(' AND ') : '1 = 0';
@@ -251,7 +259,7 @@ module.exports = {
       LEFT JOIN users pr ON pr.id = parent.receiver_id`;
     const params = [...matchParams];
 
-    if (role !== 'admin') {
+    if (role !== 'manager') {
       sql += `
         WHERE EXISTS (
           SELECT 1

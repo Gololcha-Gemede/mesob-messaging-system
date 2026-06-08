@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
-  role ENUM('admin', 'user') DEFAULT 'user',
+  role ENUM('admin', 'manager', 'user') DEFAULT 'user',
   department_id INT NULL,
   profile_image_path VARCHAR(255) NULL,
   position_title VARCHAR(255) NULL,

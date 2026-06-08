@@ -23,12 +23,21 @@ exports.searchMessages = async (req, res) => {
 
 exports.getDashboardCounts = async (req, res) => {
   try {
+    const isManager = req.user.role === 'manager';
+    const scopeSql = isManager ? '1 = 1' : '(sender_id = ? OR receiver_id = ?)';
+    const scopeParams = isManager ? [] : [req.user.id, req.user.id];
     const [[{ inbox }]] = await pool.query("SELECT COUNT(*) as inbox FROM messages WHERE receiver_id = ? AND status <> 'draft'", [req.user.id]);
-    const [[{ sent }]] = await pool.query("SELECT COUNT(*) as sent FROM messages WHERE sender_id = ? AND status <> 'draft'", [req.user.id]);
-    const [[{ received }]] = await pool.query("SELECT COUNT(*) as received FROM messages WHERE receiver_id = ? AND status <> 'draft'", [req.user.id]);
+    const [[{ sent }]] = await pool.query(
+      `SELECT COUNT(*) as sent FROM messages WHERE ${isManager ? 'status <> ?' : 'sender_id = ? AND status <> ?'}`,
+      isManager ? ['draft'] : [req.user.id, 'draft']
+    );
+    const [[{ received }]] = await pool.query(
+      `SELECT COUNT(*) as received FROM messages WHERE ${isManager ? 'status <> ?' : 'receiver_id = ? AND status <> ?'}`,
+      isManager ? ['draft'] : [req.user.id, 'draft']
+    );
     const [[{ total_messages }]] = await pool.query(
-      "SELECT COUNT(*) as total_messages FROM messages WHERE (sender_id = ? OR receiver_id = ?) AND status <> 'draft'",
-      [req.user.id, req.user.id]
+      `SELECT COUNT(*) as total_messages FROM messages WHERE ${scopeSql} AND status <> 'draft'`,
+      scopeParams
     );
     const [[{ unread }]] = await pool.query(
       "SELECT COUNT(*) as unread FROM messages WHERE receiver_id = ? AND status <> 'draft' AND read_at IS NULL",
@@ -41,19 +50,19 @@ exports.getDashboardCounts = async (req, res) => {
     const [[{ this_month }]] = await pool.query(
       `SELECT COUNT(*) as this_month
        FROM messages
-       WHERE (sender_id = ? OR receiver_id = ?)
+       WHERE ${scopeSql}
          AND status <> 'draft'
          AND COALESCE(submitted_at, created_at) >= DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
-      [req.user.id, req.user.id]
+      scopeParams
     );
     const [[{ last_month }]] = await pool.query(
       `SELECT COUNT(*) as last_month
        FROM messages
-       WHERE (sender_id = ? OR receiver_id = ?)
+       WHERE ${scopeSql}
          AND status <> 'draft'
          AND COALESCE(submitted_at, created_at) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 1 MONTH)
          AND COALESCE(submitted_at, created_at) < DATE_FORMAT(CURDATE(), '%Y-%m-01')`,
-      [req.user.id, req.user.id]
+      scopeParams
     );
     const [[{ needs_action }]] = await pool.query(
       `SELECT COUNT(*) as needs_action FROM messages
@@ -69,21 +78,21 @@ exports.getDashboardCounts = async (req, res) => {
     const [weekly_stats] = await pool.query(
       `SELECT DATE(COALESCE(submitted_at, created_at)) AS day, COUNT(*) AS count
        FROM messages
-       WHERE (sender_id = ? OR receiver_id = ?)
+       WHERE ${scopeSql}
          AND COALESCE(submitted_at, created_at) >= DATE_SUB(CURDATE(), INTERVAL 6 DAY)
        GROUP BY DATE(COALESCE(submitted_at, created_at))
        ORDER BY day ASC`,
-      [req.user.id, req.user.id]
+      scopeParams
     );
     const [monthly_stats] = await pool.query(
       `SELECT DATE_FORMAT(COALESCE(submitted_at, created_at), '%Y-%m') AS month, COUNT(*) AS count
        FROM messages
-       WHERE (sender_id = ? OR receiver_id = ?)
+       WHERE ${scopeSql}
          AND status <> 'draft'
          AND COALESCE(submitted_at, created_at) >= DATE_SUB(DATE_FORMAT(CURDATE(), '%Y-%m-01'), INTERVAL 5 MONTH)
        GROUP BY DATE_FORMAT(COALESCE(submitted_at, created_at), '%Y-%m')
        ORDER BY month ASC`,
-      [req.user.id, req.user.id]
+      scopeParams
     );
     const [recent_activity] = await pool.query(
       `SELECT me.id, me.message_id, me.event_type, me.created_at, m.subject, m.reference_number, u.name AS actor_name

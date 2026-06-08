@@ -27,6 +27,9 @@
   --role-staff-bg: #e7f7ee;
   --role-staff-text: #0d6b42;
   --role-staff-border: #8fd8b0;
+  --role-manager-bg: #e8f0ff;
+  --role-manager-text: #244c9a;
+  --role-manager-border: #9bb8f4;
 }
 
 * {
@@ -2090,6 +2093,13 @@ button.secondary-btn:hover {
   color: var(--role-staff-text);
 }
 
+.role-pill--manager,
+.status-badge--manager {
+  background: var(--role-manager-bg);
+  border-color: var(--role-manager-border);
+  color: var(--role-manager-text);
+}
+
 .status-draft {
   background: #eceff1;
   color: #455a64;
@@ -3233,6 +3243,11 @@ button:hover {
 .message-state--delivered {
   background: var(--role-staff-bg);
   color: var(--role-staff-text);
+}
+
+.status-badge--manager {
+  background: var(--role-manager-bg);
+  color: var(--role-manager-text);
 }
 
 .message-state--sent {

@@ -69,6 +69,25 @@ async function initSchema() {
   await ensureColumn('users', 'position_title', 'position_title VARCHAR(255) NULL');
   await ensureColumn('users', 'signature_image_path', 'signature_image_path VARCHAR(255) NULL');
 
+  // Existing databases may contain legacy role values such as "staff" or
+  // invalid enum blanks. Normalize them before tightening the role enum.
+  await pool.query(
+    `ALTER TABLE users
+     MODIFY role VARCHAR(32) NOT NULL DEFAULT 'user'`
+  );
+  await pool.query(
+    `UPDATE users
+     SET role = CASE
+       WHEN LOWER(TRIM(role)) = 'admin' THEN 'admin'
+       WHEN LOWER(TRIM(role)) = 'manager' THEN 'manager'
+       ELSE 'user'
+     END`
+  );
+  await pool.query(
+    `ALTER TABLE users
+     MODIFY role ENUM('admin', 'manager', 'user') DEFAULT 'user'`
+  );
+
   await pool.query(
     `UPDATE messages
      SET raw_content = COALESCE(raw_content, content),

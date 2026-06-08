@@ -52,8 +52,8 @@ export default function RegisterPage() {
       setSuccess('User registered successfully!');
       setName(''); setEmail(''); setPassword(''); setRole('user'); setDepartmentId(''); setProfileImage(null);
       setError('');
-    } catch {
-      setError('Registration failed.');
+    } catch (err) {
+      setError(err?.response?.data?.message || err?.response?.data?.error || 'Registration failed.');
       setSuccess('');
     }
   };
@@ -61,7 +61,7 @@ export default function RegisterPage() {
   return (
     <AuthPageLayout
       title="Register user"
-      subtitle="Create a staff or admin account"
+      subtitle="Create a staff, manager, or admin account"
       footerLink={{ to: '/admin', label: '< Back to admin' }}
     >
       <form className="auth-form" onSubmit={handleSubmit}>
@@ -112,6 +112,7 @@ export default function RegisterPage() {
         <AuthInputRow icon="list">
           <select className="auth-field auth-select" value={role} onChange={e => setRole(e.target.value)} required>
             <option value="user">Staff</option>
+            <option value="manager">Manager</option>
             <option value="admin">Admin</option>
           </select>
         </AuthInputRow>

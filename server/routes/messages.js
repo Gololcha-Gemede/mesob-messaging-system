@@ -12,7 +12,7 @@ router.get('/sent', authenticateToken, messageController.getSent);
 router.get('/drafts', authenticateToken, messageController.getDrafts);
 router.delete('/drafts', authenticateToken, messageController.deleteDrafts);
 router.get('/notifications', authenticateToken, messageController.getUnreadNotifications);
-router.get('/admin/all', authenticateToken, authorizeRoles('admin'), messageController.getAllMessagesAdmin);
+router.get('/admin/all', authenticateToken, authorizeRoles('manager'), messageController.getAllMessagesManager);
 router.get('/track', authenticateToken, messageController.trackMessage);
 
 router.get('/:id', authenticateToken, messageController.getMessageById);

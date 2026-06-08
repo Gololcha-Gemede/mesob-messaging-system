@@ -50,7 +50,7 @@ function cleanLetterHtml(value) {
 
 function canAccessMessage(user, message) {
   if (message.status === 'draft') return Number(message.sender_id) === Number(user.id);
-  if (user.role === 'admin') return true;
+  if (user.role === 'manager') return true;
   return Number(message.sender_id) === Number(user.id) || Number(message.receiver_id) === Number(user.id);
 }
 
@@ -324,9 +324,9 @@ exports.getUnreadNotifications = async (req, res) => {
   }
 };
 
-exports.getAllMessagesAdmin = async (req, res) => {
+exports.getAllMessagesManager = async (req, res) => {
   try {
-    const rows = await messageModel.getAllForAdmin(req.user.id);
+    const rows = await messageModel.getAllForManager(req.user.id);
     res.json(rows);
   } catch (err) {
     res.status(500).json({ message: 'Error fetching messages', error: err.message });
@@ -337,15 +337,19 @@ exports.trackMessage = async (req, res) => {
   try {
     const reference = typeof req.query.reference === 'string' ? req.query.reference : '';
     const subject = typeof req.query.subject === 'string' ? req.query.subject : '';
-    if (!reference.trim() && !subject.trim()) {
-      return res.status(400).json({ message: 'Reference number or subject is required' });
+    const dateFrom = typeof req.query.date_from === 'string' ? req.query.date_from : '';
+    const dateTo = typeof req.query.date_to === 'string' ? req.query.date_to : '';
+    if (!reference.trim() && !subject.trim() && !dateFrom.trim() && !dateTo.trim()) {
+      return res.status(400).json({ message: 'Reference number, subject, or date filter is required' });
     }
 
     const rows = await messageModel.track({
       userId: req.user.id,
       role: req.user.role,
       reference,
-      subject
+      subject,
+      dateFrom,
+      dateTo
     });
     res.json(rows);
   } catch (err) {

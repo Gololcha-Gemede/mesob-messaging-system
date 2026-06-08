@@ -21,12 +21,14 @@ function displayUser(name, id) {
 export default function TrackMessagePage() {
   const [reference, setReference] = useState('');
   const [subject, setSubject] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [messages, setMessages] = useState([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const token = sessionStorage.getItem('token');
-  const isAdmin = token ? roleFromToken(token) === 'admin' : false;
+  const isManager = token ? roleFromToken(token) === 'manager' : false;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,8 +38,12 @@ export default function TrackMessagePage() {
 
     const cleanReference = reference.trim();
     const cleanSubject = subject.trim();
-    if (!cleanReference && !cleanSubject) {
-      setError('Enter a reference number or subject.');
+    if (!cleanReference && !cleanSubject && !dateFrom && !dateTo) {
+      setError('Enter a reference number, subject, or date filter.');
+      return;
+    }
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+      setError('Start date must be before or equal to end date.');
       return;
     }
 
@@ -46,6 +52,8 @@ export default function TrackMessagePage() {
       const params = new URLSearchParams();
       if (cleanReference) params.set('reference', cleanReference);
       if (cleanSubject) params.set('subject', cleanSubject);
+      if (dateFrom) params.set('date_from', dateFrom);
+      if (dateTo) params.set('date_to', dateTo);
       const res = await axios.get(`/api/messages/track?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -80,6 +88,22 @@ export default function TrackMessagePage() {
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
           autoComplete="off"
+        />
+
+        <label htmlFor="track-date-from">From date</label>
+        <input
+          id="track-date-from"
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+        />
+
+        <label htmlFor="track-date-to">To date</label>
+        <input
+          id="track-date-to"
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
         />
 
         <button type="submit" disabled={loading}>{loading ? 'Tracking...' : 'Track Message'}</button>
@@ -124,7 +148,7 @@ export default function TrackMessagePage() {
               );
             })}
           </ul>
-          {!isAdmin ? <p className="admin-panel-hint">Staff tracking shows chains where you are a sender or receiver, including forwarded recipients.</p> : null}
+          {!isManager ? <p className="admin-panel-hint">Tracking shows chains where you are a sender or receiver, including forwarded recipients.</p> : null}
         </div>
       ) : null}
     </div>

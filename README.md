@@ -65,3 +65,7 @@ Full-stack app for internal organizational correspondence (formal letters, inbox
 
 - User accounts are normally created by an **admin** via Admin → Register user.
 - Uploaded files are stored under `server/uploads/` (not committed to git).
+
+  Comments
+admin(manages users and departments)/manager(should access all messages)/staff  ---> users
+subject, to amharic, remove table,....., remove memo and circular, track messages by date, each forwarded message should tell the original sender

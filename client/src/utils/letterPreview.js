@@ -1,8 +1,6 @@
 export const LETTER_TEMPLATES = [
   { value: 'official_letter', label: 'Official Letter' },
-  { value: 'memo', label: 'Memo' },
   { value: 'notice', label: 'Notice' },
-  { value: 'circular', label: 'Circular' },
   { value: 'request_form', label: 'Request Form' }
 ];
 

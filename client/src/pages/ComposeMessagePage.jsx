@@ -412,31 +412,6 @@ export default function ComposeMessagePage() {
     setFiles(files.filter((_, i) => i !== index));
   };
 
-  const applyFormat = (command, value = null) => {
-    document.execCommand(command, false, value);
-    const html = contentEditableRef.current?.innerHTML || '';
-    setContent(normalizeEditorHtml(html));
-    contentEditableRef.current?.focus();
-  };
-
-  const insertTable = () => {
-    const tableHtml = `
-      <table style="width:100%; border-collapse:collapse; margin:12px 0;">
-        <tbody>
-          <tr>
-            <td style="border:1px solid #cfd7e6; padding:8px;">Item</td>
-            <td style="border:1px solid #cfd7e6; padding:8px;">Details</td>
-          </tr>
-          <tr>
-            <td style="border:1px solid #cfd7e6; padding:8px;">&nbsp;</td>
-            <td style="border:1px solid #cfd7e6; padding:8px;">&nbsp;</td>
-          </tr>
-        </tbody>
-      </table>
-    `;
-    applyFormat('insertHTML', tableHtml);
-  };
-
   const handleEditorInput = (e) => {
     const html = e.currentTarget.innerHTML || '';
     setContent(normalizeEditorHtml(html));
@@ -538,60 +513,6 @@ export default function ComposeMessagePage() {
             <label className="compose-field">
               <span>Write your message</span>
               <div className="rich-editor" style={{ position: 'relative' }}>
-                <div className="editor-toolbar">
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('undo')} title="Undo" aria-label="Undo">
-                    U
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('redo')} title="Redo" aria-label="Redo">
-                    R
-                  </button>
-                  <div className="editor-separator" />
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('bold')} title="Bold">
-                    <strong>B</strong>
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('italic')} title="Italic">
-                    <em>I</em>
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('underline')} title="Underline">
-                    <u>U</u>
-                  </button>
-                  <div className="editor-separator" />
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('justifyLeft')} title="Align left" aria-label="Align left">
-                    L
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('justifyCenter')} title="Align center" aria-label="Align center">
-                    C
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('justifyRight')} title="Align right" aria-label="Align right">
-                    R
-                  </button>
-                  <div className="editor-separator" />
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('insertUnorderedList')} title="Bullet List">
-                    ⚬
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('insertOrderedList')} title="Numbered List">
-                    1.
-                  </button>
-                  <div className="editor-separator" />
-                  <button
-                    type="button"
-                    className="editor-btn"
-                    onClick={() => applyFormat('createLink', prompt('Enter URL:') || '')}
-                    title="Add Link"
-                  >
-                    🔗
-                  </button>
-                  <button type="button" className="editor-btn editor-btn--wide" onClick={insertTable} title="Insert table" aria-label="Insert table">
-                    Tbl
-                  </button>
-                  <button type="button" className="editor-btn editor-btn--wide" onClick={() => fileInputRef.current?.click()} title="Attach file" aria-label="Attach file">
-                    Att
-                  </button>
-                  <button type="button" className="editor-btn" onClick={() => applyFormat('removeFormat')} title="Clear Formatting">
-                    ✕
-                  </button>
-                </div>
-
                 <div
                   className="editor-placeholder"
                   aria-hidden={!editorIsEmpty}
@@ -600,7 +521,7 @@ export default function ComposeMessagePage() {
                     pointerEvents: 'none',
                     position: 'absolute',
                     left: 16,
-                    top: 66,
+                    top: 16,
                     zIndex: 2,
                   }}
                 >

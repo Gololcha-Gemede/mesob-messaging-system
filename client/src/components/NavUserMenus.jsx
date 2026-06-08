@@ -52,7 +52,8 @@ function formatRelativeTime(value) {
 
 function roleLabel(role) {
   if (role === 'admin') return 'Administrator';
-  if (role === 'user') return 'User';
+  if (role === 'manager') return 'Manager';
+  if (role === 'user') return 'Staff';
   return role ? String(role).replace(/_/g, ' ') : 'Staff';
 }
 
@@ -545,7 +546,7 @@ export default function NavUserMenus({ token }) {
                     {profile?.position_title ? (
                       <span className="profile-popover-title">{profile.position_title}</span>
                     ) : null}
-                    <span className={`status-pill role-pill role-pill--${profile?.role === 'admin' ? 'admin' : 'staff'}`}>
+                    <span className={`status-pill role-pill role-pill--${profile?.role === 'admin' ? 'admin' : profile?.role === 'manager' ? 'manager' : 'staff'}`}>
                       {roleLabel(profile?.role)}
                     </span>
                   </div>

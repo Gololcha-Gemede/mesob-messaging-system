@@ -22,7 +22,7 @@ export default function AdminPanelPage() {
   const [editForm, setEditForm] = useState({
     name: '',
     email: '',
-    role: 'staff',
+    role: 'user',
     department_id: '',
     password: '',
   });
@@ -116,7 +116,7 @@ export default function AdminPanelPage() {
 
   const cancelEditUser = () => {
     setEditingUser(null);
-    setEditForm({ name: '', email: '', role: 'staff', department_id: '', password: '' });
+    setEditForm({ name: '', email: '', role: 'user', department_id: '', password: '' });
   };
 
   const saveUser = async () => {
@@ -164,7 +164,8 @@ export default function AdminPanelPage() {
   const totalPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
   const visibleUsers = filteredUsers.slice((page - 1) * pageSize, page * pageSize);
   const adminCount = users.filter((user) => user.role === 'admin').length;
-  const staffCount = users.filter((user) => user.role !== 'admin').length;
+  const managerCount = users.filter((user) => user.role === 'manager').length;
+  const staffCount = users.filter((user) => user.role === 'user').length;
   const effectiveSelectedDepartmentId = departments.some((department) => department.id === selectedDepartmentId)
     ? selectedDepartmentId
     : departments[0]?.id ?? null;
@@ -186,6 +187,7 @@ export default function AdminPanelPage() {
       <div className="admin-stats-grid">
         <div className="admin-stat-card"><span>Total Users</span><strong>{users.length}</strong></div>
         <div className="admin-stat-card admin-stat-card--admin"><span>Admins</span><strong>{adminCount}</strong></div>
+        <div className="admin-stat-card"><span>Managers</span><strong>{managerCount}</strong></div>
         <div className="admin-stat-card admin-stat-card--staff"><span>Staff</span><strong>{staffCount}</strong></div>
         <div className="admin-stat-card"><span>Departments</span><strong>{departments.length}</strong></div>
       </div>
@@ -195,7 +197,7 @@ export default function AdminPanelPage() {
           <div className="admin-section-heading">
             <div>
               <h3>Users</h3>
-              <p className="admin-panel-hint">Create, edit, and delete staff or admin accounts.</p>
+              <p className="admin-panel-hint">Create, edit, and delete staff, manager, or admin accounts.</p>
             </div>
             <button
               type="button"
@@ -225,7 +227,8 @@ export default function AdminPanelPage() {
             }}>
               <option value="all">All roles</option>
               <option value="admin">Admin</option>
-              <option value="staff">Staff</option>
+              <option value="manager">Manager</option>
+              <option value="user">Staff</option>
             </select>
             <select value={departmentFilter} onChange={(e) => {
               setDepartmentFilter(e.target.value);
@@ -246,8 +249,9 @@ export default function AdminPanelPage() {
                 <input type="email" placeholder="Email" value={editForm.email} onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))} />
                 <input type="password" placeholder="New password (optional)" value={editForm.password} onChange={(e) => setEditForm((f) => ({ ...f, password: e.target.value }))} autoComplete="new-password" />
                 <select value={editForm.role} onChange={(e) => setEditForm((f) => ({ ...f, role: e.target.value }))}>
-                  <option value="staff">Staff</option>
                   <option value="admin">Admin</option>
+                  <option value="manager">Manager</option>
+                  <option value="user">Staff</option>
                 </select>
                 <select value={editForm.department_id} onChange={(e) => setEditForm((f) => ({ ...f, department_id: e.target.value }))} required>
                   <option value="">Select department</option>
@@ -284,7 +288,7 @@ export default function AdminPanelPage() {
                       </div>
                     </td>
                     <td>{u.email}</td>
-                    <td><span className={`status-badge status-badge--${u.role === 'admin' ? 'admin' : 'staff'}`}>{u.role}</span></td>
+                    <td><span className={`status-badge status-badge--${u.role === 'admin' ? 'admin' : u.role === 'manager' ? 'manager' : 'staff'}`}>{u.role === 'user' ? 'staff' : u.role}</span></td>
                     <td>{departmentName(u.department_id)}</td>
                     <td className="admin-table-actions">
                       <div className="table-action-row">
