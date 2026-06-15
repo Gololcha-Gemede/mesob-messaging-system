@@ -5,6 +5,7 @@ module.exports = {
     const {
       sender_id,
       receiver_id,
+      receiver_name = null,
       sender_name = null,
       subject,
       content,
@@ -25,13 +26,14 @@ module.exports = {
     } = message;
     const [result] = await pool.query(
       `INSERT INTO messages (
-        sender_id, receiver_id, sender_name, subject, content, raw_content, formatted_content, template_type,
+        sender_id, receiver_id, receiver_name, sender_name, subject, content, raw_content, formatted_content, template_type,
         reference_number, status, file_path, file_name, file_mime, file_size, pdf_path,
         department_id, due_date, submitted_at, delivered_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`,
       [
         sender_id,
         receiver_id,
+        receiver_name,
         sender_name,
         subject,
         raw_content,
@@ -367,7 +369,7 @@ module.exports = {
   },
   async getById(id) {
     const [rows] = await pool.query(
-      `SELECT m.*, s.name AS sender_name, r.name AS receiver_name
+      `SELECT m.*, s.name AS sender_user_name, r.name AS receiver_user_name
        FROM messages m
        LEFT JOIN users s ON s.id = m.sender_id
        LEFT JOIN users r ON r.id = m.receiver_id

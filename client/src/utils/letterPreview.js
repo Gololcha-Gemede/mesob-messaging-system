@@ -101,7 +101,16 @@ function signatureSection({ senderName, senderTitle, signatureImagePath }) {
   `;
 }
 
-function header({ templateLabel, recipientName, senderName }) {
+function formatPreviewDate(value = new Date()) {
+  const date = value instanceof Date ? value : new Date(value);
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function header({ templateLabel, senderName }) {
   return `
     <header class="letter-header">
       <div class="letter-logo-slot"><img src="/qms-logo.png" alt=""></div>
@@ -110,11 +119,38 @@ function header({ templateLabel, recipientName, senderName }) {
         <p>${escapeHtml(templateLabel)} Internal Correspondence</p>
       </div>
     </header>
-    <section class="letter-meta-grid">
-      <div><strong>Reference No:</strong> IMS-${new Date().getFullYear()}-PREVIEW</div>
-      <div><strong>Date:</strong> ${escapeHtml(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }))}</div>
-      <div><strong>From:</strong> ${escapeHtml(senderName || 'Current user')}</div>
-      <div><strong>To:</strong> ${escapeHtml(recipientName || 'Recipient')}</div>
+  `;
+}
+
+function officialLetterMeta({ referenceNumber, date, recipientLine }) {
+  return `
+    <header class="letter-header">
+      <div class="letter-logo-slot"><img src="/qms-logo.png" alt=""></div>
+      <div>
+        <h1>MESOB INTERNAL MESSAGING SYSTEM</h1>
+        <p>Official Internal Correspondence</p>
+      </div>
+    </header>
+    <section class="letter-top-meta">
+      <div class="letter-top-meta__stack">
+        <div>ቁጥር/Ref no: ${escapeHtml(referenceNumber)}</div>
+        <div>ቀን/Date : ${escapeHtml(formatPreviewDate(date))}</div>
+      </div>
+    </section>
+    <section class="letter-recipient-line">${escapeHtml(recipientLine || 'Recipient')}</section>
+  `;
+}
+
+function officialLetterClosing({ senderName, signatureImagePath }) {
+  const signatureImage = signatureImagePath
+    ? `<img class="letter-signature-image" src="${escapeHtml(signatureImagePath)}" alt="${escapeHtml(senderName || 'Current user')} signature">`
+    : '<span class="letter-signature-placeholder">Signature</span>';
+
+  return `
+    <section class="letter-closing-block">
+      <p>ከሰላምታ ጋር</p>
+      <strong>${escapeHtml(senderName || 'Current user')}</strong>
+      ${signatureImage}
     </section>
   `;
 }
@@ -127,27 +163,27 @@ export function buildClientLetterPreview({ templateType, recipientName, subject,
 
   if (template.value === 'memo') {
     body = `
-      ${header({ templateLabel: 'Memo', recipientName, senderName })}
+      ${header({ templateLabel: 'Memo', senderName })}
       <section class="letter-subject"><span>Memo</span><strong>${safeSubject}</strong></section>
       <section class="letter-body">${paragraphs(content)}<p>For your information and necessary action.</p></section>
     `;
   } else if (template.value === 'notice') {
     body = `
-      ${header({ templateLabel: 'Notice', recipientName, senderName })}
+      ${header({ templateLabel: 'Notice', senderName })}
       <section class="letter-notice-title">NOTICE</section>
       <section class="letter-subject"><span>Regarding</span><strong>${safeSubject}</strong></section>
       <section class="letter-body">${paragraphs(content)}</section>
     `;
   } else if (template.value === 'circular') {
     body = `
-      ${header({ templateLabel: 'Circular', recipientName, senderName })}
+      ${header({ templateLabel: 'Circular', senderName })}
       <section class="letter-notice-title">CIRCULAR</section>
       <section class="letter-subject"><span>Subject</span><strong>${safeSubject}</strong></section>
       <section class="letter-body"><p>Dear Team,</p>${paragraphs(content)}<p>Kind regards,</p></section>
     `;
   } else if (template.value === 'request_form') {
     body = `
-      ${header({ templateLabel: 'Request Form', recipientName, senderName })}
+      ${header({ templateLabel: 'Request Form', senderName })}
       <section class="letter-subject"><span>Request</span><strong>${safeSubject}</strong></section>
       <section class="letter-request-box">
         <div><strong>Requested by</strong><span>Current user</span></div>
@@ -158,9 +194,9 @@ export function buildClientLetterPreview({ templateType, recipientName, subject,
     `;
   } else {
     body = `
-      ${header({ templateLabel: 'Official', recipientName, senderName })}
-      <section class="letter-subject"><span>Subject</span><strong>${safeSubject}</strong></section>
-      <section class="letter-body"><p>Dear ${safeRecipient},</p>${paragraphs(content)}<p>Kind regards,</p></section>
+      ${officialLetterMeta({ referenceNumber: `IMS-${new Date().getFullYear()}-PREVIEW`, date: new Date(), recipientLine: recipientName })}
+      <section class="letter-subject-line"><span>ጉዳዩ፡-</span><strong>${safeSubject}</strong></section>
+      <section class="letter-body">${paragraphs(content)}</section>
     `;
   }
 
@@ -168,7 +204,7 @@ export function buildClientLetterPreview({ templateType, recipientName, subject,
     <article class="official-letter" data-template="${escapeHtml(template.value)}">
       ${body}
       ${attachmentSection(file)}
-      ${signatureSection({ senderName, senderTitle, signatureImagePath })}
+      ${template.value === 'official_letter' ? officialLetterClosing({ senderName, signatureImagePath }) : signatureSection({ senderName, senderTitle, signatureImagePath })}
       <footer class="letter-footer">${escapeHtml(template.label)} generated by MESOB Internal Messaging System</footer>
     </article>
   `;

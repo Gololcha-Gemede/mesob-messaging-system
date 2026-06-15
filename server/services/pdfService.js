@@ -48,13 +48,23 @@ function letterLines(input) {
   lines.push({ text: 'MESOB INTERNAL MESSAGING SYSTEM', font: 'bold', size: 16, center: true });
   lines.push({ text: `${data.templateType.replace(/_/g, ' ').toUpperCase()} INTERNAL CORRESPONDENCE`, font: 'regular', size: 10, center: true });
   lines.push({ spacer: 14 });
-  lines.push({ text: `Reference No: ${data.referenceNumber}`, font: 'bold', size: 11 });
-  lines.push({ text: `Date: ${formatDate(data.date)}`, font: 'regular', size: 11 });
-  lines.push({ spacer: 8 });
-  lines.push({ text: `From: ${data.senderName}`, font: 'regular', size: 11 });
-  lines.push({ text: `To: ${data.recipientName}`, font: 'regular', size: 11 });
-  lines.push({ text: `Subject: ${data.subject}`, font: 'bold', size: 12 });
-  lines.push({ spacer: 10 });
+  if (data.templateType === 'official_letter') {
+    lines.push({ text: `ቁጥር/Ref no: ${data.referenceNumber}`, font: 'bold', size: 11, alignRight: true });
+    lines.push({ text: `ቀን/Date : ${formatDate(data.date)}`, font: 'regular', size: 11, alignRight: true });
+    lines.push({ spacer: 10 });
+    lines.push({ text: `${data.recipientLine || data.recipientName}`, font: 'bold', size: 11 });
+    lines.push({ spacer: 8 });
+    lines.push({ text: `ጉዳዩ፡- ${data.subject}`, font: 'bold', size: 12, center: true });
+    lines.push({ spacer: 10 });
+  } else {
+    lines.push({ text: `Reference No: ${data.referenceNumber}`, font: 'bold', size: 11 });
+    lines.push({ text: `Date: ${formatDate(data.date)}`, font: 'regular', size: 11 });
+    lines.push({ spacer: 8 });
+    lines.push({ text: `From: ${data.senderName}`, font: 'regular', size: 11 });
+    lines.push({ text: `To: ${data.recipientName}`, font: 'regular', size: 11 });
+    lines.push({ text: `Subject: ${data.subject}`, font: 'bold', size: 12 });
+    lines.push({ spacer: 10 });
+  }
 
   if (data.templateType === 'memo') {
     lines.push({ text: 'MEMO', font: 'bold', size: 14, center: true });
@@ -76,13 +86,6 @@ function letterLines(input) {
     addWrapped(lines, paragraph.replace(/\n/g, ' '), { size: 11 });
   });
 
-  lines.push({ spacer: 12 });
-  if (data.templateType === 'memo') {
-    lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });
-  } else {
-    lines.push({ text: 'Kind regards,', font: 'regular', size: 11 });
-  }
-
   if (data.attachments.length) {
     lines.push({ spacer: 12 });
     lines.push({ text: 'Attachments:', font: 'bold', size: 11 });
@@ -91,6 +94,17 @@ function letterLines(input) {
       const sizeLabel = Number.isFinite(size) && size > 0 ? ` (${Math.ceil(size / 1024)} KB)` : '';
       addWrapped(lines, `- ${item.name}${sizeLabel}`, { size: 10, maxChars: 92 });
     });
+  }
+
+  lines.push({ spacer: 12 });
+  if (data.templateType === 'official_letter') {
+    lines.push({ text: 'ከሰላምታ ጋር', font: 'regular', size: 11, alignRight: true });
+    lines.push({ text: data.senderName, font: 'bold', size: 11, alignRight: true });
+    lines.push({ text: 'Signature', font: 'regular', size: 10, alignRight: true });
+  } else if (data.templateType === 'memo') {
+    lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });
+  } else {
+    lines.push({ text: 'Kind regards,', font: 'regular', size: 11 });
   }
 
   // Watermark (drawn near bottom center on each page via PDF stream)
@@ -143,7 +157,7 @@ function streamForPage(lines) {
     const font = line.font === 'bold' ? 'F2' : 'F1';
     const size = line.size || 11;
     const approxWidth = String(line.text || '').length * size * 0.48;
-    const x = line.center ? Math.max(LEFT, (PAGE_WIDTH - approxWidth) / 2) : LEFT;
+    const x = line.center ? Math.max(LEFT, (PAGE_WIDTH - approxWidth) / 2) : (line.alignRight ? Math.max(LEFT, PAGE_WIDTH - RIGHT - approxWidth) : LEFT);
 
     // Optional watermark styling (light gray)
     if (line.watermark) {

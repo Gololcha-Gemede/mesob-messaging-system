@@ -45,6 +45,7 @@ async function initDatabase() {
         id INT AUTO_INCREMENT PRIMARY KEY,
         sender_id INT NOT NULL,
         receiver_id INT NULL,
+        receiver_name VARCHAR(255) NULL,
         subject VARCHAR(255) NOT NULL,
         content TEXT,
         raw_content TEXT,

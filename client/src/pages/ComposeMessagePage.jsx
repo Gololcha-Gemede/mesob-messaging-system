@@ -10,6 +10,7 @@ const EMPTY_DRAFT = {
   subject: '',
   content: '',
   receivers: [],
+  receiverName: '',
   raw: null,
 };
 
@@ -23,6 +24,7 @@ const loadSavedDraft = () => {
       subject: draft.subject || '',
       content: draft.content || '',
       receivers: Array.isArray(draft.receivers) ? draft.receivers : [],
+      receiverName: draft.receiverName || '',
       raw,
     };
   } catch (err) {
@@ -81,6 +83,7 @@ export default function ComposeMessagePage() {
   const [subject, setSubject] = useState(initialDraft.subject);
   const [content, setContent] = useState(initialDraft.content);
   const [receivers, setReceivers] = useState(initialDraft.receivers);
+  const [receiverName, setReceiverName] = useState(initialDraft.receiverName);
   const [currentUser, setCurrentUser] = useState(null);
 
   const [files, setFiles] = useState([]);
@@ -171,6 +174,7 @@ export default function ComposeMessagePage() {
         subject,
         content,
         receivers,
+        receiverName,
       });
 
       if (composeDraft === lastSavedDraft) {
@@ -198,11 +202,10 @@ export default function ComposeMessagePage() {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [templateType, subject, content, receivers, lastSavedDraft]);
+  }, [templateType, subject, content, receivers, receiverName, lastSavedDraft]);
 
   const firstRecipientName = useMemo(() => {
     const selected = users.find((user) => Number(user.id) === Number(receivers[0]));
-    if (receivers.length > 1) return `${selected?.name || 'Recipient'} + ${receivers.length - 1}`;
     return selected?.name || 'Recipient';
   }, [receivers, users]);
 
@@ -216,7 +219,7 @@ export default function ComposeMessagePage() {
     () =>
       buildClientLetterPreview({
         templateType,
-        recipientName: firstRecipientName,
+        recipientName: receiverName.trim() || firstRecipientName,
         subject,
         content,
         file: firstFile,
@@ -231,6 +234,7 @@ export default function ComposeMessagePage() {
     setSubject('');
     setContent('');
     setReceivers([]);
+    setReceiverName('');
     setFiles([]);
     setServerPreviewHtml('');
     setPreviewOpen(false);
@@ -247,8 +251,8 @@ export default function ComposeMessagePage() {
   };
 
   const validateForSubmit = () => {
-    if (receivers.length === 0) {
-      setError('Please select at least one receiver.');
+    if (receivers.length === 0 && !receiverName.trim()) {
+      setError('Please enter a receiver name or select at least one internal receiver.');
       return false;
     }
     if (!subject.trim()) {
@@ -281,6 +285,7 @@ export default function ComposeMessagePage() {
           subject: subject.trim(),
           content: normalizeEditorHtml(content),
           template_type: templateType,
+          receiver_name: receiverName.trim(),
           attachment_name: files[0]?.name || '',
           attachment_mime: files[0]?.type || '',
           attachment_size: files[0]?.size || 0,
@@ -318,6 +323,7 @@ export default function ComposeMessagePage() {
     formData.append('subject', subject.trim());
     formData.append('content', normalizeEditorHtml(content));
     formData.append('template_type', templateType);
+    formData.append('receiver_name', receiverName.trim());
     formData.append('action', action);
 
     try {
@@ -414,7 +420,17 @@ export default function ComposeMessagePage() {
             </label>
 
             <label className="compose-field">
-              <span>Recipients</span>
+              <span>Receiver name / institution</span>
+              <input
+                type="text"
+                placeholder="e.g., Ministry of Health or Dr. Jane Doe"
+                value={receiverName}
+                onChange={(e) => setReceiverName(e.target.value)}
+              />
+            </label>
+
+            <label className="compose-field">
+              <span>Internal recipients</span>
               <RecipientPicker users={users} selectedIds={receivers} onChange={setReceivers} />
             </label>
 

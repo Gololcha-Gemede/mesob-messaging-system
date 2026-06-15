@@ -96,6 +96,7 @@ function buildLetterPayload({
   reference_number,
   sender,
   receiver,
+  receiver_name,
   subject,
   content,
   attachments,
@@ -108,6 +109,7 @@ function buildLetterPayload({
     senderName: sender?.name || 'Sender',
     senderTitle: sender?.position_title || '',
     recipientName: receiver?.name || 'Recipient',
+    recipientLine: receiver_name || receiver?.name || 'Recipient',
     subject: subject || '(No subject)',
     body: content || '',
     attachments,
@@ -123,6 +125,7 @@ async function createGeneratedMessage(payload, { sender, receiver, attachments, 
       reference_number,
       sender,
       receiver,
+      receiver_name: payload.receiver_name,
       subject: payload.subject,
       content: payload.raw_content || payload.content,
       attachments
@@ -142,7 +145,7 @@ async function createGeneratedMessage(payload, { sender, receiver, attachments, 
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, template_type } = req.body;
+    const { receiver_id, receiver_ids, receiver_name, subject, content, department_id, action, due_date, template_type } = req.body;
     const sender_id = req.user.id;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
     const effectiveDepartmentId = req.user.department_id || department_id || await getUserDepartmentId(sender_id);
@@ -151,7 +154,8 @@ exports.sendMessage = async (req, res) => {
     }
 
     const normalizedAction = action === 'draft' ? 'draft' : 'submit';
-    if (normalizedAction === 'submit' && selectedReceiverIds.length === 0) {
+    const receiverNameTrimmed = typeof receiver_name === 'string' ? receiver_name.trim() : '';
+    if (normalizedAction === 'submit' && selectedReceiverIds.length === 0 && !receiverNameTrimmed) {
       return res.status(400).json({ message: 'At least one receiver is required to submit a message' });
     }
 
@@ -177,6 +181,7 @@ exports.sendMessage = async (req, res) => {
       const { messageId, reference_number } = await createGeneratedMessage({
         sender_id,
         receiver_id: receiverId,
+        receiver_name: receiverNameTrimmed,
         subject: normalizedAction === 'submit' ? subjectTrimmed : (subject || ''),
         raw_content: content || '',
         content: content || '',
@@ -226,9 +231,10 @@ exports.sendMessage = async (req, res) => {
 
 exports.previewMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, template_type } = req.body;
+    const { receiver_id, receiver_ids, receiver_name, subject, content, template_type } = req.body;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
     const sender = await userModel.findById(req.user.id);
+    const receiverNameTrimmed = typeof receiver_name === 'string' ? receiver_name.trim() : '';
 
     const receiver = selectedReceiverIds[0] ? await userModel.findById(selectedReceiverIds[0]) : null;
     const reference_number = `IMS-${new Date().getFullYear()}-PREVIEW`;
@@ -237,6 +243,7 @@ exports.previewMessage = async (req, res) => {
       reference_number,
       sender,
       receiver,
+      receiver_name: receiverNameTrimmed,
       subject: subject || '(No subject)',
       content: content || '',
       // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
@@ -407,6 +414,7 @@ exports.submitDraft = async (req, res) => {
       reference_number: message.reference_number,
       sender: senderForLetter,
       receiver,
+      receiver_name: message.receiver_name,
       subject: message.subject,
       content: message.raw_content || message.content,
       // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.

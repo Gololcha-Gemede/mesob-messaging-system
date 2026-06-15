@@ -83,6 +83,33 @@ function paragraphsFromContent(content) {
     .join('');
 }
 
+function officialLetterMeta(data) {
+  return `
+    ${baseHeader(data, 'Official')}
+    <section class="letter-top-meta">
+      <div class="letter-top-meta__stack">
+        <div>ቁጥር/Ref no: ${escapeHtml(data.referenceNumber)}</div>
+        <div>ቀን/Date : ${escapeHtml(formatDate(data.date))}</div>
+      </div>
+    </section>
+    <section class="letter-recipient-line">${escapeHtml(data.recipientLine || data.recipientName)}</section>
+  `;
+}
+
+function officialLetterClosing(data) {
+  const signatureImage = data.signatureImagePath
+    ? `<img class="letter-signature-image" src="${escapeHtml(data.signatureImagePath)}" alt="${escapeHtml(data.senderName)} signature">`
+    : '<span class="letter-signature-placeholder">Signature</span>';
+
+  return `
+    <section class="letter-closing-block">
+      <p>ከሰላምታ ጋር</p>
+      <strong>${escapeHtml(data.senderName)}</strong>
+      ${signatureImage}
+    </section>
+  `;
+}
+
 function attachmentRows(attachments = []) {
   const cleanAttachments = attachments.filter((item) => item?.name);
   if (!cleanAttachments.length) return '';
@@ -135,15 +162,13 @@ function baseHeader(data, templateLabel) {
 
 function officialLetter(data) {
   return `
-    ${baseHeader(data, 'Official')}
-    <section class="letter-subject"><span>Subject</span><strong>${escapeHtml(data.subject)}</strong></section>
+    ${officialLetterMeta(data)}
+    <section class="letter-subject-line"><span>ጉዳዩ፡-</span><strong>${escapeHtml(data.subject)}</strong></section>
     <section class="letter-body">
-      <p>Dear ${escapeHtml(data.recipientName)},</p>
       ${paragraphsFromContent(data.body)}
-      <p>Kind regards,</p>
     </section>
     ${attachmentRows(data.attachments)}
-    ${signatureBlock(data)}
+    ${officialLetterClosing(data)}
   `;
 }
 
@@ -221,6 +246,7 @@ function buildLetterData(input = {}) {
     senderName: input.senderName || 'Sender',
     senderTitle: input.senderTitle || '',
     recipientName: input.recipientName || 'Recipient',
+    recipientLine: input.recipientLine || input.recipientName || 'Recipient',
     subject: input.subject || '(No subject)',
     body: input.body || '',
     attachments: Array.isArray(input.attachments) ? input.attachments : [],
