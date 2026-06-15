@@ -6,7 +6,10 @@ const { loginRateLimiter } = require('../middleware/security');
 const upload = require('../middleware/multer');
 
 router.post('/login', loginRateLimiter, authController.login);
-router.post('/register', authController.register);
+router.post('/register', upload.fields([
+	{ name: 'profile_image', maxCount: 1 },
+	{ name: 'signature_image', maxCount: 1 }
+]), authController.register);
 router.get('/me', authenticateToken, authController.me);
 router.put('/me', authenticateToken, upload.single('profile_image'), authController.updateMe);
 

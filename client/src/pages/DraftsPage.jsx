@@ -98,7 +98,6 @@ export default function DraftsPage() {
           <h2>Drafts</h2>
           <p className="admin-panel-hint">Resume, review, or remove saved message drafts.</p>
         </div>
-        <span className="autosave-indicator">Autosave ready</span>
       </div>
       <div className="message-filters" role="search" aria-label="Filter drafts">
         <input

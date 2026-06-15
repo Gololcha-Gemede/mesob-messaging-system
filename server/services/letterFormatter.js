@@ -102,9 +102,13 @@ function attachmentRows(attachments = []) {
 }
 
 function signatureBlock(data) {
+  const signatureImage = data.signatureImagePath
+    ? `<img class="letter-signature-image" src="${escapeHtml(data.signatureImagePath)}" alt="${escapeHtml(data.senderName)} signature">`
+    : '';
   const title = data.senderTitle ? `<span>${escapeHtml(data.senderTitle)}</span>` : '';
   return `
     <section class="letter-signature">
+      ${signatureImage}
       <strong>${escapeHtml(data.senderName)}</strong>
       ${title}
     </section>

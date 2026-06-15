@@ -4,13 +4,11 @@ import RecipientPicker from '../components/RecipientPicker';
 import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
 import { LETTER_TEMPLATES, buildClientLetterPreview } from '../utils/letterPreview';
-import { roleFromToken } from '../utils/jwt';
 
 const EMPTY_DRAFT = {
   templateType: 'official_letter',
   subject: '',
   content: '',
-  sendName: '',
   receivers: [],
   raw: null,
 };
@@ -24,7 +22,6 @@ const loadSavedDraft = () => {
       templateType: draft.templateType || EMPTY_DRAFT.templateType,
       subject: draft.subject || '',
       content: draft.content || '',
-      sendName: draft.sendName || '',
       receivers: Array.isArray(draft.receivers) ? draft.receivers : [],
       raw,
     };
@@ -76,33 +73,15 @@ const normalizeEditorHtml = (html) => {
   return cleaned;
 };
 
-const formatAutosaveLabel = (status, savedAt) => {
-  if (status === 'saving') return 'Saving...';
-  if (!savedAt) return 'Draft not saved yet';
-
-  const seconds = Math.max(0, Math.round((Date.now() - savedAt.getTime()) / 1000));
-  if (status === 'saved' || seconds < 5) return 'Saved just now';
-  if (seconds < 60) return `Auto-saved ${seconds} seconds ago`;
-  const minutes = Math.floor(seconds / 60);
-  return `Auto-saved ${minutes} minute${minutes === 1 ? '' : 's'} ago`;
-};
-
-const stripHtmlForSuggestion = (html) =>
-  String(html || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-
 export default function ComposeMessagePage() {
   const token = sessionStorage.getItem('token');
-  const isAdmin = roleFromToken(token) === 'admin';
   const [initialDraft] = useState(loadSavedDraft);
   const [users, setUsers] = useState([]);
   const [templateType, setTemplateType] = useState(initialDraft.templateType);
   const [subject, setSubject] = useState(initialDraft.subject);
   const [content, setContent] = useState(initialDraft.content);
-  const [sendName, setSendName] = useState(initialDraft.sendName);
   const [receivers, setReceivers] = useState(initialDraft.receivers);
+  const [currentUser, setCurrentUser] = useState(null);
 
   const [files, setFiles] = useState([]);
   const [success, setSuccess] = useState('');
@@ -156,28 +135,26 @@ export default function ComposeMessagePage() {
   }, [token]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      setCurrentUser(null);
+      return;
+    }
     let ignore = false;
 
     axios
       .get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
         if (ignore) return;
-        const profileName = String(res.data?.name || res.data?.email || '').trim();
-        if (!profileName) return;
-        setSendName((current) => {
-          if (isAdmin && current.trim()) return current;
-          return profileName;
-        });
+        setCurrentUser(res.data || null);
       })
       .catch(() => {
-        setSendName((current) => current || sessionStorage.getItem('email') || 'Current user');
+        setCurrentUser(null);
       });
 
     return () => {
       ignore = true;
     };
-  }, [isAdmin, token]);
+  }, [token]);
 
   useEffect(() => {
     if (!autosavedAt) return undefined;
@@ -185,10 +162,7 @@ export default function ComposeMessagePage() {
     return () => window.clearInterval(interval);
   }, [autosavedAt]);
 
-  // Autosave functionality
   useEffect(() => {
-    if (!sendName.trim()) return;
-
     if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
 
     autosaveTimer.current = setTimeout(async () => {
@@ -196,7 +170,6 @@ export default function ComposeMessagePage() {
         templateType,
         subject,
         content,
-        sendName,
         receivers,
       });
 
@@ -225,7 +198,7 @@ export default function ComposeMessagePage() {
     return () => {
       if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
     };
-  }, [templateType, subject, content, sendName, receivers, lastSavedDraft]);
+  }, [templateType, subject, content, receivers, lastSavedDraft]);
 
   const firstRecipientName = useMemo(() => {
     const selected = users.find((user) => Number(user.id) === Number(receivers[0]));
@@ -247,22 +220,12 @@ export default function ComposeMessagePage() {
         subject,
         content,
         file: firstFile,
-        senderName: sendName,
+        senderName: currentUser?.name || sessionStorage.getItem('email') || 'Current user',
+        senderTitle: currentUser?.position_title || '',
+        signatureImagePath: currentUser?.signature_image_path || '',
       }),
-    [content, firstFile, firstRecipientName, sendName, subject, templateType]
+    [content, currentUser, firstFile, firstRecipientName, subject, templateType]
   );
-
-  const autosaveLabel = formatAutosaveLabel(autosaveStatus, autosavedAt);
-
-  const subjectSuggestions = useMemo(() => {
-    const selectedLetterTemplate = LETTER_TEMPLATES.find((template) => template.value === templateType);
-    const firstLine = stripHtmlForSuggestion(content).slice(0, 72);
-    return [
-      selectedLetterTemplate?.label ? `${selectedLetterTemplate.label} Request` : '',
-      firstLine ? `Regarding ${firstLine}` : '',
-      'Request for Equipment Approval',
-    ].filter(Boolean);
-  }, [content, templateType]);
 
   const resetForm = () => {
     setSubject('');
@@ -284,10 +247,6 @@ export default function ComposeMessagePage() {
   };
 
   const validateForSubmit = () => {
-    if (!sendName.trim()) {
-      setError('Please enter the sender name.');
-      return false;
-    }
     if (receivers.length === 0) {
       setError('Please select at least one receiver.');
       return false;
@@ -304,10 +263,6 @@ export default function ComposeMessagePage() {
   };
 
   const validateForDraft = () => {
-    if (!sendName.trim()) {
-      setError('Please enter the sender name before saving a draft.');
-      return false;
-    }
     return true;
   };
 
@@ -326,7 +281,6 @@ export default function ComposeMessagePage() {
           subject: subject.trim(),
           content: normalizeEditorHtml(content),
           template_type: templateType,
-          sender_name: sendName.trim(),
           attachment_name: files[0]?.name || '',
           attachment_mime: files[0]?.type || '',
           attachment_size: files[0]?.size || 0,
@@ -364,7 +318,6 @@ export default function ComposeMessagePage() {
     formData.append('subject', subject.trim());
     formData.append('content', normalizeEditorHtml(content));
     formData.append('template_type', templateType);
-    formData.append('sender_name', sendName.trim());
     formData.append('action', action);
 
     try {
@@ -432,12 +385,6 @@ export default function ComposeMessagePage() {
           <h2>Compose Message</h2>
           <p className="admin-panel-hint">Create and send official internal correspondence</p>
         </div>
-        <div className="compose-status-row">
-          <span className={`autosave-indicator autosave-${autosaveStatus === 'saving' ? 'saving' : autosavedAt ? 'saved' : 'idle'}`} aria-live="polite">
-            <span aria-hidden="true">{autosaveStatus === 'saving' ? '...' : autosavedAt ? 'OK' : '-'}</span>
-            {autosaveLabel}
-          </span>
-        </div>
       </div>
 
       <div className="compose-document-layout compose-document-layout--single">
@@ -472,36 +419,14 @@ export default function ComposeMessagePage() {
             </label>
 
             <label className="compose-field">
-              <span>Sender Name</span>
-              <div className={`locked-input-wrap${isAdmin ? ' locked-input-wrap--editable' : ''}`}>
-                <input
-                  type="text"
-                  placeholder="Sender name is loaded from your profile"
-                  value={sendName}
-                  onChange={(e) => setSendName(e.target.value)}
-                  readOnly={!isAdmin}
-                  aria-readonly={!isAdmin}
-                  required
-                />
-                <span className="locked-input-badge">{isAdmin ? 'Admin editable' : 'Locked'}</span>
-              </div>
-            </label>
-
-            <label className="compose-field">
               <span>Subject</span>
               <input
                 type="text"
                 placeholder="e.g., Request for Equipment Approval"
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
-                list="compose-subject-suggestions"
                 required
               />
-              <datalist id="compose-subject-suggestions">
-                {subjectSuggestions.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
             </label>
           </section>
 
@@ -570,10 +495,6 @@ export default function ComposeMessagePage() {
             </div>
           )}
           </section>
-
-          <div className="compose-hint">
-            Tip: Your message is automatically saved as you type. Select a letter template to format your correspondence professionally.
-          </div>
 
           <div className="button-row compose-action-row">
             <button type="button" className="secondary-btn" onClick={() => handleSubmit('draft')} disabled={submitting || previewing}>

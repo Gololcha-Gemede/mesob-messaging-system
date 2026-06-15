@@ -4,7 +4,7 @@ const { audit } = require('../utils/audit');
 const { validatePassword } = require('../utils/passwordPolicy');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
 
-function uploadedProfilePath(file) {
+function uploadedFilePath(file) {
   return file?.filename ? `/uploads/${file.filename}` : null;
 }
 
@@ -22,8 +22,12 @@ exports.createUser = async (req, res) => {
     }
     const passwordError = validatePassword(password);
     if (passwordError) return res.status(400).json({ message: passwordError });
-    const uploadError = await validateUploadedFile(req.file, { allowPdf: false, allowImages: true });
-    if (uploadError) return res.status(400).json({ message: uploadError });
+    const profileImage = req.files?.profile_image?.[0];
+    const signatureImage = req.files?.signature_image?.[0];
+    const profileUploadError = await validateUploadedFile(profileImage, { allowPdf: false, allowImages: true });
+    if (profileUploadError) return res.status(400).json({ message: profileUploadError });
+    const signatureUploadError = await validateUploadedFile(signatureImage, { allowPdf: false, allowImages: true });
+    if (signatureUploadError) return res.status(400).json({ message: signatureUploadError });
     const existing = await userModel.findByEmail(email);
     if (existing) return res.status(400).json({ message: 'Email already in use' });
     const normalizedRole = normalizeRole(role);
@@ -34,7 +38,8 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
       role: normalizedRole,
       department_id,
-      profile_image_path: uploadedProfilePath(req.file)
+      profile_image_path: uploadedFilePath(profileImage),
+      signature_image_path: uploadedFilePath(signatureImage)
     });
     audit('admin_created_user', req, { user_id: userId, role: normalizedRole });
     res.status(201).json({ id: userId });

@@ -17,7 +17,6 @@ export default function MessageDetailPage() {
   const [history, setHistory] = useState([]);
   const [recipients, setRecipients] = useState([]);
   const [forwardTo, setForwardTo] = useState([]);
-  const [forwardNote, setForwardNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
@@ -110,14 +109,13 @@ export default function MessageDetailPage() {
       setIsForwarding(true);
       await axios.post(
         `/api/messages/${id}/forward`,
-        { new_receiver_ids: forwardTo, new_receiver_id: forwardTo[0] || '', note: forwardNote },
+        { new_receiver_ids: forwardTo, new_receiver_id: forwardTo[0] || '' },
         { headers: authHeaders }
       );
       setFeedback('Message forwarded.');
       notify({ type: 'success', title: 'Message Sent confirmation', message: 'Message was forwarded successfully.' });
       setError('');
       setForwardTo([]);
-      setForwardNote('');
       await Promise.all([loadMessage(), loadHistory()]);
     } catch (err) {
       const apiMessage = err?.response?.data?.message;
@@ -231,12 +229,6 @@ export default function MessageDetailPage() {
           selectedIds={forwardTo}
           onChange={setForwardTo}
           placeholder="Search recipients by username"
-        />
-        <input
-          type="text"
-          placeholder="Forward note"
-          value={forwardNote}
-          onChange={(e) => setForwardNote(e.target.value)}
         />
         <button className="forward-btn" onClick={handleForward} disabled={isForwarding}>
           {isForwarding ? 'Forwarding...' : 'Forward'}

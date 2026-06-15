@@ -69,3 +69,12 @@ Full-stack app for internal organizational correspondence (formal letters, inbox
   Comments
 admin(manages users and departments)/manager(should access all messages)/staff  ---> users
 subject, to amharic, remove table,....., remove memo and circular, track messages by date, each forwarded message should tell the original sender
+
+Modifications
+- Add a signature field to registration that will be displayed at the bottom of the letters
+- Change the format of the formal letter to look like real letter and change some terms to amharic
+- Remove the dropdown options in the subject field
+- Remove sender name field as it will take the current user as the sender
+- Remove unnecessary texts from the compose page and draft page like 'Auto-saved 58 minutes ago' and others
+- remove forward note field when forwarding a message
+- status?

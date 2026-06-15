@@ -111,7 +111,7 @@ function buildLetterPayload({
     subject: subject || '(No subject)',
     body: content || '',
     attachments,
-    signatureImagePath: '',
+    signatureImagePath: sender?.signature_image_path || '',
     logoUrl: '/qms-logo.png'
   };
 }
@@ -142,16 +142,12 @@ async function createGeneratedMessage(payload, { sender, receiver, attachments, 
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, template_type, sender_name } = req.body;
+    const { receiver_id, receiver_ids, subject, content, department_id, action, due_date, template_type } = req.body;
     const sender_id = req.user.id;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
-    const senderNameTrimmed = typeof sender_name === 'string' ? sender_name.trim() : '';
     const effectiveDepartmentId = req.user.department_id || department_id || await getUserDepartmentId(sender_id);
     if (!effectiveDepartmentId) {
       return res.status(400).json({ message: 'Department is required to send a message' });
-    }
-    if (!senderNameTrimmed) {
-      return res.status(400).json({ message: 'Sender name is required' });
     }
 
     const normalizedAction = action === 'draft' ? 'draft' : 'submit';
@@ -168,7 +164,6 @@ exports.sendMessage = async (req, res) => {
     const uploadError = await validateUploadedFile(req.file, { allowPdf: true, allowImages: true });
     if (uploadError) return res.status(400).json({ message: uploadError });
     const sender = await userModel.findById(sender_id);
-    const senderForLetter = { ...sender, name: senderNameTrimmed };
     const attachmentFields = fileMetadata(req.file);
     // Note: actual file metadata is stored on the message (file_path/file_name/etc.)
     // but attachments are not rendered inside the letter HTML.
@@ -186,14 +181,14 @@ exports.sendMessage = async (req, res) => {
         raw_content: content || '',
         content: content || '',
         template_type: normalizeTemplateType(template_type),
-        sender_name: senderNameTrimmed,
+        sender_name: sender?.name || null,
         status,
 
         ...attachmentFields,
         department_id: effectiveDepartmentId,
         due_date: due_date || null
       }, {
-        sender: senderForLetter,
+        sender,
         receiver,
         attachments: [],
         shouldGeneratePdf: normalizedAction === 'submit'
@@ -231,12 +226,8 @@ exports.sendMessage = async (req, res) => {
 
 exports.previewMessage = async (req, res) => {
   try {
-    const { receiver_id, receiver_ids, subject, content, template_type, sender_name } = req.body;
+    const { receiver_id, receiver_ids, subject, content, template_type } = req.body;
     const selectedReceiverIds = parseRecipientIds(receiver_ids || receiver_id);
-    const senderNameTrimmed = typeof sender_name === 'string' ? sender_name.trim() : '';
-    if (!senderNameTrimmed) {
-      return res.status(400).json({ message: 'Sender name is required' });
-    }
     const sender = await userModel.findById(req.user.id);
 
     const receiver = selectedReceiverIds[0] ? await userModel.findById(selectedReceiverIds[0]) : null;
@@ -244,10 +235,7 @@ exports.previewMessage = async (req, res) => {
     const letterPayload = buildLetterPayload({
       template_type,
       reference_number,
-      sender: {
-        ...sender,
-        name: senderNameTrimmed
-      },
+      sender,
       receiver,
       subject: subject || '(No subject)',
       content: content || '',

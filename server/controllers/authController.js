@@ -6,7 +6,7 @@ const { audit } = require('../utils/audit');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
 require('dotenv').config();
 
-function uploadedProfilePath(file) {
+function uploadedFilePath(file) {
   return file?.filename ? `/uploads/${file.filename}` : undefined;
 }
 
@@ -59,13 +59,21 @@ exports.register = async (req, res) => {
     if (existing) return res.status(400).json({ message: 'Email already in use' });
 
     const hashedPassword = await bcrypt.hash(password, 10);
+    const profileImage = req.files?.profile_image?.[0];
+    const signatureImage = req.files?.signature_image?.[0];
+    const profileUploadError = await validateUploadedFile(profileImage, { allowPdf: false, allowImages: true });
+    if (profileUploadError) return res.status(400).json({ message: profileUploadError });
+    const signatureUploadError = await validateUploadedFile(signatureImage, { allowPdf: false, allowImages: true });
+    if (signatureUploadError) return res.status(400).json({ message: signatureUploadError });
+
     const userId = await userModel.create({
       name,
       email,
       password: hashedPassword,
       role: 'user',
       department_id: null,
-      profile_image_path: uploadedProfilePath(req.file) || null
+      profile_image_path: uploadedFilePath(profileImage) || null,
+      signature_image_path: uploadedFilePath(signatureImage) || null
     });
     audit('user_registered', req, { user_id: userId, email });
 
