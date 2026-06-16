@@ -104,7 +104,6 @@ function officialLetterClosing(data) {
   return `
     <section class="letter-closing-block">
       <p>ከሰላምታ ጋር</p>
-      <strong>${escapeHtml(data.senderName)}</strong>
       ${signatureImage}
     </section>
   `;
@@ -151,12 +150,7 @@ function baseHeader(data, templateLabel) {
         <p>${escapeHtml(templateLabel)} Internal Correspondence</p>
       </div>
     </header>
-    <section class="letter-meta-grid">
-      <div><strong>Reference No:</strong> ${escapeHtml(data.referenceNumber)}</div>
-      <div><strong>Date:</strong> ${escapeHtml(formatDate(data.date))}</div>
-      <div><strong>From:</strong> ${escapeHtml(data.senderName)}</div>
-      <div><strong>To:</strong> ${escapeHtml(data.recipientName)}</div>
-    </section>
+    
   `;
 }
 

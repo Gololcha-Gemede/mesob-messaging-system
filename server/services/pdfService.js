@@ -49,19 +49,14 @@ function letterLines(input) {
   lines.push({ text: `${data.templateType.replace(/_/g, ' ').toUpperCase()} INTERNAL CORRESPONDENCE`, font: 'regular', size: 10, center: true });
   lines.push({ spacer: 14 });
   if (data.templateType === 'official_letter') {
-    lines.push({ text: `ቁጥር/Ref no: ${data.referenceNumber}`, font: 'bold', size: 11, alignRight: true });
-    lines.push({ text: `ቀን/Date : ${formatDate(data.date)}`, font: 'regular', size: 11, alignRight: true });
-    lines.push({ spacer: 10 });
+    // removed top metadata (reference/date/from/to) per request
     lines.push({ text: `${data.recipientLine || data.recipientName}`, font: 'bold', size: 11 });
     lines.push({ spacer: 8 });
     lines.push({ text: `ጉዳዩ፡- ${data.subject}`, font: 'bold', size: 12, center: true });
     lines.push({ spacer: 10 });
   } else {
-    lines.push({ text: `Reference No: ${data.referenceNumber}`, font: 'bold', size: 11 });
-    lines.push({ text: `Date: ${formatDate(data.date)}`, font: 'regular', size: 11 });
+    // removed top metadata (reference/date/from/to) per request
     lines.push({ spacer: 8 });
-    lines.push({ text: `From: ${data.senderName}`, font: 'regular', size: 11 });
-    lines.push({ text: `To: ${data.recipientName}`, font: 'regular', size: 11 });
     lines.push({ text: `Subject: ${data.subject}`, font: 'bold', size: 12 });
     lines.push({ spacer: 10 });
   }
@@ -99,7 +94,6 @@ function letterLines(input) {
   lines.push({ spacer: 12 });
   if (data.templateType === 'official_letter') {
     lines.push({ text: 'ከሰላምታ ጋር', font: 'regular', size: 11, alignRight: true });
-    lines.push({ text: data.senderName, font: 'bold', size: 11, alignRight: true });
     lines.push({ text: 'Signature', font: 'regular', size: 10, alignRight: true });
   } else if (data.templateType === 'memo') {
     lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });

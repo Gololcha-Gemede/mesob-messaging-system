@@ -149,7 +149,6 @@ function officialLetterClosing({ senderName, signatureImagePath }) {
   return `
     <section class="letter-closing-block">
       <p>ከሰላምታ ጋር</p>
-      <strong>${escapeHtml(senderName || 'Current user')}</strong>
       ${signatureImage}
     </section>
   `;
