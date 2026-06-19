@@ -5871,3 +5871,789 @@ a:focus-visible,
     overflow-x: auto;
   }
 }
+
+/* ============================================================
+   COMPREHENSIVE RESPONSIVE LAYER
+   ============================================================ */
+
+/* ---------- 1024px: tablets / small laptops ---------- */
+@media (max-width: 1024px) {
+  .top-nav-inner {
+    padding: 0.6rem 1rem;
+  }
+
+  .compose-document-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .compose-preview-pane {
+    border-left: none;
+    border-top: 1px solid var(--border);
+    padding-left: 0;
+    padding-top: 1rem;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---------- 860px: landscape tablets ---------- */
+@media (max-width: 860px) {
+  .top-nav-inner {
+    gap: 0.5rem;
+  }
+
+  .top-nav-links {
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .top-nav a.nav-link {
+    font-size: 0.82rem;
+    padding: 0.35rem 0.6rem;
+  }
+
+  .brand-logo {
+    height: 36px;
+  }
+
+  .letter-preview-modal {
+    width: 95vw;
+    max-height: 90vh;
+  }
+
+  .admin-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ---------- 768px: portrait tablets / large phones ---------- */
+@media (max-width: 768px) {
+  .top-nav-inner {
+    padding: 0.55rem 0.75rem;
+  }
+
+  .brand-logo {
+    height: 32px;
+  }
+
+  .brand-title {
+    font-size: 0.95rem;
+  }
+
+  .brand-sub {
+    display: none;
+  }
+
+  .top-nav-links {
+    gap: 0.3rem;
+  }
+
+  .top-nav a.nav-link {
+    font-size: 0.78rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 5px;
+  }
+
+  .icon-btn--profile {
+    width: 34px;
+    height: 34px;
+  }
+
+  .side-nav {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+    gap: 0.4rem;
+    padding: 0.5rem;
+    min-height: auto;
+    position: static;
+  }
+
+  .side-nav-link {
+    font-size: 0.82rem;
+    min-height: 36px;
+    justify-content: center;
+    text-align: center;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .side-nav-link svg {
+    display: none;
+  }
+
+  .side-nav-group {
+    gap: 0.3rem;
+  }
+
+  .side-nav-submenu {
+    display: none;
+  }
+
+  .dashboard-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-metrics {
+    min-width: 0;
+  }
+
+  .compose-section {
+    padding: 0.8rem;
+  }
+
+  .template-buttons {
+    gap: 0.4rem;
+  }
+
+  .template-btn {
+    font-size: 0.78rem;
+    padding: 0.4rem 0.6rem;
+  }
+
+  .letter-preview-modal {
+    width: 98vw;
+    margin: 0.5rem;
+  }
+
+  .letter-preview-scroll {
+    padding: 0.5rem;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
+  }
+
+  .profile-edit-avatar-section {
+    padding: 1rem 0.75rem 0.75rem;
+  }
+
+  .profile-edit-avatar-wrapper {
+    width: 72px;
+    height: 72px;
+  }
+
+  .profile-edit-fields {
+    padding: 1rem 0.75rem;
+    gap: 0.8rem;
+  }
+
+  .profile-edit-actions {
+    padding: 0 0.75rem 1rem;
+    gap: 0.5rem;
+  }
+
+  .top-popover--profile {
+    width: min(300px, calc(100vw - 1.5rem));
+  }
+
+  .top-popover--notifications {
+    width: min(340px, calc(100vw - 1.5rem));
+  }
+
+  .notification-item-main {
+    padding: 0.55rem 0.6rem;
+  }
+
+  .notification-item-subject {
+    font-size: 0.82rem;
+  }
+
+  .notification-item-meta {
+    font-size: 0.7rem;
+  }
+
+  .recipient-picker-control {
+    min-height: 36px;
+  }
+
+  .recipient-picker-input {
+    min-width: 120px;
+    font-size: 0.85rem;
+  }
+
+  .recipient-chip {
+    font-size: 0.78rem;
+    padding: 0.2rem 0.45rem;
+  }
+
+  .compose-action-row {
+    flex-wrap: wrap;
+  }
+
+  .compose-action-row > button {
+    flex: 1 1 100%;
+  }
+
+  .inbox-section-title {
+    font-size: 0.9rem;
+  }
+
+  .message-item-title {
+    font-size: 0.9rem;
+  }
+
+  .message-item-meta {
+    gap: 0.3rem;
+  }
+
+  .document-action-row {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .document-action-row > button {
+    flex: 1 1 100%;
+  }
+
+  .history-list li {
+    font-size: 0.82rem;
+  }
+}
+
+/* ---------- 640px: phones ---------- */
+@media (max-width: 640px) {
+  .top-nav-inner {
+    padding: 0.5rem 0.6rem;
+    gap: 0.4rem;
+  }
+
+  .brand-block {
+    gap: 0.5rem;
+  }
+
+  .brand-logo {
+    height: 28px;
+  }
+
+  .brand-title {
+    font-size: 0.85rem;
+  }
+
+  .top-nav-links {
+    gap: 0.25rem;
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .top-nav a.nav-link {
+    font-size: 0.72rem;
+    padding: 0.25rem 0.45rem;
+    gap: 0.25rem;
+  }
+
+  .top-nav a.nav-link span {
+    display: none;
+  }
+
+  .icon-btn--profile {
+    width: 30px;
+    height: 30px;
+  }
+
+  .profile-avatar-fallback {
+    font-size: 0.75rem;
+  }
+
+  .dashboard-container,
+  .inbox-container,
+  .sent-container,
+  .drafts-container,
+  .track-container,
+  .compose-container,
+  .message-detail-container,
+  .admin-panel-container {
+    padding: 0.75rem;
+    border-radius: 0;
+  }
+
+  .dashboard-hero {
+    padding: 1rem;
+    gap: 0.8rem;
+  }
+
+  .dashboard-hero-metrics {
+    min-width: 0;
+    gap: 0.6rem;
+  }
+
+  .dashboard-kpi-card {
+    padding: 0.75rem;
+    min-width: 0;
+  }
+
+  .dashboard-kpi-value {
+    font-size: 1.4rem;
+  }
+
+  .dashboard-kpi-label {
+    font-size: 0.72rem;
+  }
+
+  .dashboard-panel {
+    padding: 0.8rem;
+  }
+
+  .dashboard-chart {
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+
+  .stat-card {
+    padding: 0.8rem;
+  }
+
+  .stat-value {
+    font-size: 1.3rem;
+  }
+
+  .message-filters {
+    padding: 0.5rem;
+    gap: 0.4rem;
+  }
+
+  .message-filter-select,
+  .message-filter-input {
+    font-size: 0.82rem;
+    padding: 0.45rem 0.6rem;
+  }
+
+  .message-item {
+    border-radius: 8px;
+  }
+
+  .message-item-row {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .message-item-content {
+    gap: 0.35rem;
+  }
+
+  .message-item-title {
+    font-size: 0.85rem;
+  }
+
+  .message-item-meta {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .message-ref {
+    font-size: 0.7rem;
+  }
+
+  .message-date {
+    font-size: 0.7rem;
+  }
+
+  .compose-section {
+    padding: 0.6rem;
+  }
+
+  .compose-field label {
+    font-size: 0.78rem;
+  }
+
+  .compose-field input,
+  .compose-field textarea,
+  .compose-field select {
+    font-size: 0.85rem;
+    padding: 0.5rem 0.6rem;
+  }
+
+  .compose-action-row {
+    gap: 0.4rem;
+  }
+
+  .compose-action-row > button {
+    padding: 0.55rem 0.6rem;
+    font-size: 0.82rem;
+  }
+
+  .template-buttons {
+    gap: 0.3rem;
+  }
+
+  .template-btn {
+    font-size: 0.72rem;
+    padding: 0.35rem 0.5rem;
+    border-radius: 6px;
+  }
+
+  .letter-preview-modal {
+    width: 100vw;
+    max-height: 100vh;
+    margin: 0;
+    border-radius: 0;
+  }
+
+  .letter-preview-scroll {
+    padding: 0.4rem;
+  }
+
+  .letter-subject-line {
+    max-width: 100%;
+  }
+
+  .letter-recipient-line {
+    max-width: 100%;
+  }
+
+  .official-letter {
+    padding: 1rem;
+    font-size: 0.9rem;
+  }
+
+  .letter-header img {
+    height: auto;
+  }
+
+  .letter-body {
+    font-size: 0.88rem;
+    line-height: 1.55;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+    font-size: 0.85rem;
+  }
+
+  .document-action-row {
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .document-action-row > button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .history-list li {
+    font-size: 0.78rem;
+    padding: 0.4rem 0;
+  }
+
+  .profile-edit-avatar-section {
+    padding: 0.75rem 0.6rem 0.5rem;
+  }
+
+  .profile-edit-avatar-wrapper {
+    width: 64px;
+    height: 64px;
+  }
+
+  .profile-edit-avatar-overlay {
+    font-size: 0.65rem;
+    padding: 0.3rem 0.5rem;
+  }
+
+  .profile-edit-fields {
+    padding: 0.75rem 0.6rem;
+    gap: 0.7rem;
+  }
+
+  .profile-field-label {
+    font-size: 0.7rem;
+  }
+
+  .profile-field-input-wrapper {
+    padding: 0 0.6rem;
+  }
+
+  .profile-field-input-wrapper input {
+    font-size: 0.85rem;
+    padding: 0.55rem 0;
+  }
+
+  .profile-edit-actions {
+    padding: 0 0.6rem 1rem;
+  }
+
+  .profile-save-btn,
+  .profile-cancel-btn {
+    padding: 0.6rem 0.75rem;
+    font-size: 0.82rem;
+  }
+
+  .top-popover--profile {
+    width: min(280px, calc(100vw - 1rem));
+  }
+
+  .top-popover--notifications {
+    width: min(300px, calc(100vw - 1rem));
+  }
+
+  .notification-item-main {
+    padding: 0.5rem;
+  }
+
+  .notification-item-subject {
+    font-size: 0.78rem;
+  }
+
+  .notification-item-meta {
+    font-size: 0.68rem;
+  }
+
+  .notification-dismiss-btn {
+    width: 26px;
+    height: 26px;
+  }
+
+  .nav-popover-header {
+    padding: 0.6rem 0.75rem;
+  }
+
+  .nav-popover-header h3 {
+    font-size: 0.88rem;
+  }
+
+  .nav-popover-footer {
+    padding: 0.5rem 0.75rem;
+    gap: 0.4rem;
+    flex-direction: column;
+  }
+
+  .recipient-picker-control {
+    min-height: 34px;
+  }
+
+  .recipient-picker-input {
+    min-width: 100px;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.5rem;
+  }
+
+  .recipient-chip {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+    gap: 0.25rem;
+  }
+
+  .recipient-picker-menu {
+    font-size: 0.82rem;
+  }
+
+  .recipient-option {
+    padding: 0.5rem 0.65rem;
+    font-size: 0.82rem;
+  }
+
+  .recipient-department-filter {
+    font-size: 0.78rem;
+    padding: 0.35rem 0.5rem;
+  }
+
+  .admin-toolbar {
+    grid-template-columns: 1fr;
+    gap: 0.4rem;
+  }
+
+  .admin-table {
+    font-size: 0.82rem;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 0.45rem 0.5rem;
+  }
+
+  .admin-edit-user-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-section-heading {
+    flex-direction: column;
+    gap: 0.4rem;
+    align-items: stretch;
+  }
+
+  .department-management-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .department-user-list li {
+    flex-direction: column;
+    gap: 0.3rem;
+    align-items: stretch;
+  }
+
+  .compose-file-drop {
+    padding: 1rem;
+    font-size: 0.82rem;
+  }
+
+  .editor-toolbar {
+    gap: 0.2rem;
+    padding: 0.35rem;
+  }
+
+  .editor-toolbar button {
+    width: 28px;
+    height: 28px;
+    font-size: 0.75rem;
+  }
+
+  .editor-content {
+    min-height: 180px;
+    font-size: 0.88rem;
+    padding: 0.6rem;
+  }
+
+  .autosave-indicator {
+    font-size: 0.7rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .compose-status-row {
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  .pagination-row {
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+  }
+
+  .empty-state {
+    padding: 2rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .list-state {
+    padding: 2rem 1rem;
+    font-size: 0.85rem;
+  }
+
+  .error,
+  .success {
+    font-size: 0.82rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .auth-submit {
+    padding: 0.65rem 1rem;
+    font-size: 0.88rem;
+  }
+
+  .forward-btn {
+    width: 100%;
+    padding: 0.6rem;
+  }
+}
+
+/* ---------- 480px: small phones ---------- */
+@media (max-width: 480px) {
+  .top-nav-inner {
+    padding: 0.4rem 0.5rem;
+  }
+
+  .brand-logo {
+    height: 24px;
+  }
+
+  .brand-title {
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+  }
+
+  .top-nav a.nav-link {
+    font-size: 0.68rem;
+    padding: 0.22rem 0.35rem;
+  }
+
+  .icon-btn--profile {
+    width: 28px;
+    height: 28px;
+  }
+
+  .dashboard-container,
+  .inbox-container,
+  .sent-container,
+  .drafts-container,
+  .track-container,
+  .compose-container,
+  .message-detail-container {
+    padding: 0.6rem;
+  }
+
+  .dashboard-hero {
+    padding: 0.75rem;
+  }
+
+  .dashboard-kpi-card {
+    padding: 0.6rem;
+  }
+
+  .dashboard-kpi-value {
+    font-size: 1.2rem;
+  }
+
+  .compose-section {
+    padding: 0.5rem;
+  }
+
+  .compose-field input,
+  .compose-field textarea {
+    font-size: 0.82rem;
+    padding: 0.45rem 0.5rem;
+  }
+
+  .template-btn {
+    font-size: 0.68rem;
+    padding: 0.3rem 0.4rem;
+  }
+
+  .official-letter {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+  }
+
+  .letter-body {
+    font-size: 0.84rem;
+  }
+
+  .message-item-row {
+    padding: 0.5rem;
+  }
+
+  .message-item-title {
+    font-size: 0.82rem;
+  }
+
+  .profile-edit-avatar-wrapper {
+    width: 56px;
+    height: 56px;
+  }
+
+  .profile-edit-avatar-fallback {
+    font-size: 1.4rem;
+  }
+
+  .profile-field-input-wrapper input {
+    font-size: 0.82rem;
+  }
+
+  .notification-item-subject {
+    font-size: 0.75rem;
+  }
+
+  .recipient-picker-input {
+    min-width: 80px;
+    font-size: 0.78rem;
+  }
+}
