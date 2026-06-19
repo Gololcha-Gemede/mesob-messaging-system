@@ -1,4 +1,4 @@
-# MESOB IMMS — Internal Message Management System
+# Mesob Connect — Internal Message Management System
 
 Full-stack app for internal organizational correspondence (formal letters, inbox, tracking) and direct messages between users.
 

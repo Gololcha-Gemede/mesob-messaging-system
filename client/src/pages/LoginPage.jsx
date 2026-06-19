@@ -88,7 +88,7 @@ export default function LoginPage() {
   return (
     <AuthPageLayout
       title="Sign in"
-      subtitle="Internal Message Management System"
+      subtitle="Internal Message Management A-Mesob | Lideta Center"
       className={loginSuccess ? 'auth-fullscreen--success' : ''}
     >
       {loginSuccess ? (

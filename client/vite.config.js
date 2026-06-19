@@ -11,6 +11,18 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('proxyRes', (proxyRes, req) => {
+            if (req.url?.startsWith('/api/events')) {
+              proxyRes.headers['cache-control'] = 'no-cache';
+              proxyRes.headers['x-accel-buffering'] = 'no';
+              proxyRes.headers['content-type'] = 'text/event-stream';
+              if (proxyRes.socket) {
+                proxyRes.socket.setNoDelay(true);
+              }
+            }
+          });
+        },
       },
       '/uploads': {
         target: 'http://localhost:5000',

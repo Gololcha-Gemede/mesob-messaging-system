@@ -133,7 +133,7 @@ exports.updateMe = async (req, res) => {
     };
     if (password) payload.password = await bcrypt.hash(password, 10);
     if (position_title !== undefined) payload.position_title = position_title;
-    const profileImagePath = uploadedProfilePath(req.file);
+    const profileImagePath = uploadedFilePath(req.file);
     if (profileImagePath !== undefined) payload.profile_image_path = profileImagePath;
     await userModel.update(req.user.id, payload);
     audit('profile_updated', req, { user_id: req.user.id });

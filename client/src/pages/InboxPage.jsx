@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { useSSE } from '../hooks/useSSE';
 
 function formatDate(dateString) {
   if (!dateString) return '';
@@ -20,39 +21,49 @@ export default function InboxPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const token = sessionStorage.getItem('token');
+
+  const fetchInbox = useCallback(() => {
+    const params = new URLSearchParams();
+    if (filterValue.trim()) params.set(filterBy, filterValue.trim());
+    if (statusFilter) params.set('status', statusFilter);
+    const qs = params.toString();
+    setError('');
+    axios
+      .get(`/api/messages/inbox${qs ? `?${qs}` : ''}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      .then((res) => {
+        setMessages(Array.isArray(res.data) ? res.data : []);
+        setPage(1);
+      })
+      .catch((err) => {
+        setMessages([]);
+        setError(err?.response?.data?.message || 'Unable to load inbox messages.');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [token, filterBy, filterValue, statusFilter]);
+
+  useSSE(token, {
+    onNewMessage: () => {
+      fetchInbox();
+    }
+  });
 
   useEffect(() => {
     let ignore = false;
     const t = setTimeout(() => {
-      const params = new URLSearchParams();
-      if (filterValue.trim()) params.set(filterBy, filterValue.trim());
-      if (statusFilter) params.set('status', statusFilter);
-      const qs = params.toString();
+      if (ignore) return;
       setLoading(true);
-      setError('');
-      axios
-        .get(`/api/messages/inbox${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
-        })
-        .then((res) => {
-          if (ignore) return;
-          setMessages(Array.isArray(res.data) ? res.data : []);
-          setPage(1);
-        })
-        .catch((err) => {
-          if (ignore) return;
-          setMessages([]);
-          setError(err?.response?.data?.message || 'Unable to load inbox messages.');
-        })
-        .finally(() => {
-          if (!ignore) setLoading(false);
-        });
+      fetchInbox();
     }, 300);
     return () => {
       ignore = true;
       clearTimeout(t);
     };
-  }, [filterBy, filterValue, statusFilter]);
+  }, [fetchInbox]);
 
   const pageSize = 8;
   const totalPages = Math.max(1, Math.ceil(messages.length / pageSize));

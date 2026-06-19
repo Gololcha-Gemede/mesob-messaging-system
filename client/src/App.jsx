@@ -120,7 +120,7 @@ function NavBar() {
 							}}
 						/>
 						<div className="brand-text">
-							<span className="brand-title">MESOB IMMS</span>
+							<span className="brand-title">Mesob Connect</span>
 							<span className="brand-sub">Internal message management</span>
 						</div>
 					</Link>
@@ -185,7 +185,7 @@ function SideBar() {
 				<img className="side-nav-site-logo" src={APP_LOGO} alt="" width={40} height={40} />
 				<div className="side-nav-site-text">
 					<span className="side-nav-site-title">Lideta Center</span>
-					<span className="side-nav-site-sub">MESOB IMMS</span>
+					<span className="side-nav-site-sub">Mesob Connect</span>
 				</div>
 			</div>
 			<NavLink className={({ isActive }) => `side-nav-link${isActive ? ' side-nav-link--active' : ''}`} to="/" end><Icon name="dashboard" /><span className="side-nav-label">Dashboard</span></NavLink>

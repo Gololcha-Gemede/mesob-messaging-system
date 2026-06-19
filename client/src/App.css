@@ -226,6 +226,16 @@ body {
   pointer-events: none;
 }
 
+.auth-panel-site-title {
+  color: #fff;
+  font-family: var(--font);
+  font-size: 1.6rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin: 0 0 0.5rem;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 .auth-panel-logo-wrap {
   position: relative;
   display: flex;

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
 import { notify } from '../utils/notify';
+import { useSSE } from '../hooks/useSSE';
 
 function Icon({ name }) {
   const icons = {
@@ -131,6 +132,16 @@ export default function NavUserMenus({ token }) {
     }
   }, [token]);
 
+  useSSE(token, {
+    onNewMessage: (data) => {
+      loadNavData(false);
+      notify({ type: 'info', title: 'New message', message: `From ${data.sender_name}: ${data.subject || '(No subject)'}` });
+    },
+    onMessageRead: (data) => {
+      console.log('[Real-time] Message read:', data);
+    }
+  });
+
   useEffect(() => {
     if (!token) return undefined;
     let ignore = false;
@@ -141,7 +152,7 @@ export default function NavUserMenus({ token }) {
     run();
     const interval = window.setInterval(() => {
       if (!ignore) loadNavData(false);
-    }, 30000);
+    }, 60000);
     return () => {
       ignore = true;
       window.clearInterval(interval);
@@ -189,21 +200,30 @@ export default function NavUserMenus({ token }) {
     setProfileMessage('');
     setProfileMessageTone('');
     try {
-      const body = new FormData();
-      body.append('name', profileForm.name);
-      body.append('email', profileForm.email);
-      if (profileForm.password) body.append('password', profileForm.password);
-      if (profileForm.profile_image) body.append('profile_image', profileForm.profile_image);
-      const res = await axios.put('/api/auth/me', body, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      let res;
+      if (profileForm.profile_image) {
+        const body = new FormData();
+        body.append('name', profileForm.name);
+        body.append('email', profileForm.email);
+        if (profileForm.password) body.append('password', profileForm.password);
+        body.append('profile_image', profileForm.profile_image);
+        res = await axios.put('/api/auth/me', body, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+      } else {
+        const payload = { name: profileForm.name, email: profileForm.email };
+        if (profileForm.password) payload.password = profileForm.password;
+        res = await axios.put('/api/auth/me', payload, {
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+        });
+      }
       setProfile(res.data);
       setProfileForm({ name: res.data.name || '', email: res.data.email || '', password: '', profile_image: null });
       setEditingProfile(false);
       setProfileMessage('Profile saved successfully.');
       setProfileMessageTone('success');
     } catch (err) {
-      setProfileMessage(err?.response?.data?.message || 'Could not update profile.');
+      setProfileMessage(err?.response?.data?.message || err?.response?.data?.error || 'Could not update profile.');
       setProfileMessageTone('error');
     } finally {
       setProfileSaving(false);

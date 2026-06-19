@@ -62,6 +62,7 @@ export default function AuthPageLayout({ title, subtitle, children, footerLink, 
     <div className={['auth-fullscreen', className].filter(Boolean).join(' ')}>
       <div className="auth-panel" role="region" aria-label={title}>
         <div className="auth-panel-brand">
+          <h2 className="auth-panel-site-title">Mesob Connect</h2>
           <div className="auth-panel-logo-wrap" aria-hidden="true">
             <img
               className="auth-panel-logo"
@@ -74,7 +75,7 @@ export default function AuthPageLayout({ title, subtitle, children, footerLink, 
               }}
             />
           </div>
-          <p className="auth-panel-tagline">Internal Message Management - MESOB</p>
+          <p className="auth-panel-tagline">Internal Message Management<br />A-Mesob | Lideta Center</p>
         </div>
         <div className="auth-panel-form">
           <h1 className="auth-title">{title}</h1>

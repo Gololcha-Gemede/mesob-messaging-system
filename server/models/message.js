@@ -56,45 +56,53 @@ module.exports = {
     return result.insertId;
   },
   async getInbox(userId, filters = {}) {
-    let sql = "SELECT * FROM messages WHERE receiver_id = ? AND status <> 'draft'";
+    let sql = `SELECT m.*, COALESCE(m.sender_name, s.name) AS sender_name, COALESCE(m.receiver_name, r.name) AS receiver_name
+               FROM messages m
+               LEFT JOIN users s ON s.id = m.sender_id
+               LEFT JOIN users r ON r.id = m.receiver_id
+               WHERE m.receiver_id = ? AND m.status <> 'draft'`;
     const params = [userId];
     const subject = typeof filters.subject === 'string' ? filters.subject.trim() : '';
     const reference = typeof filters.reference === 'string' ? filters.reference.trim() : '';
     if (subject) {
-      sql += ' AND subject LIKE ?';
+      sql += ' AND m.subject LIKE ?';
       params.push(`%${subject}%`);
     }
     if (reference) {
-      sql += ' AND reference_number LIKE ?';
+      sql += ' AND m.reference_number LIKE ?';
       params.push(`%${reference}%`);
     }
     const status = typeof filters.status === 'string' ? filters.status.trim() : '';
     if (status === 'read') {
-      sql += ' AND read_at IS NOT NULL';
+      sql += ' AND m.read_at IS NOT NULL';
     } else if (status === 'unread') {
-      sql += ' AND read_at IS NULL';
+      sql += ' AND m.read_at IS NULL';
     } else if (status) {
-      sql += ' AND status = ?';
+      sql += ' AND m.status = ?';
       params.push(status);
     }
-    sql += ' ORDER BY id DESC';
+    sql += ' ORDER BY m.id DESC';
     const [rows] = await pool.query(sql, params);
     return rows;
   },
   async getSent(userId, filters = {}) {
-    let sql = "SELECT * FROM messages WHERE sender_id = ? AND status <> 'draft'";
+    let sql = `SELECT m.*, COALESCE(m.sender_name, s.name) AS sender_name, COALESCE(m.receiver_name, r.name) AS receiver_name
+               FROM messages m
+               LEFT JOIN users s ON s.id = m.sender_id
+               LEFT JOIN users r ON r.id = m.receiver_id
+               WHERE m.sender_id = ? AND m.status <> 'draft'`;
     const params = [userId];
     const subject = typeof filters.subject === 'string' ? filters.subject.trim() : '';
     const reference = typeof filters.reference === 'string' ? filters.reference.trim() : '';
     if (subject) {
-      sql += ' AND subject LIKE ?';
+      sql += ' AND m.subject LIKE ?';
       params.push(`%${subject}%`);
     }
     if (reference) {
-      sql += ' AND reference_number LIKE ?';
+      sql += ' AND m.reference_number LIKE ?';
       params.push(`%${reference}%`);
     }
-    sql += ' ORDER BY id DESC';
+    sql += ' ORDER BY m.id DESC';
     const [rows] = await pool.query(sql, params);
     return rows;
   },
@@ -132,10 +140,12 @@ module.exports = {
   },
   async getUnreadForUser(userId) {
     const [rows] = await pool.query(
-      `SELECT id, subject, reference_number, status, sender_id, submitted_at, created_at
-       FROM messages
-       WHERE receiver_id = ? AND status <> 'draft' AND read_at IS NULL
-       ORDER BY id DESC
+      `SELECT m.id, m.subject, m.reference_number, m.status, m.sender_id, m.submitted_at, m.created_at,
+              COALESCE(m.sender_name, s.name) AS sender_name
+       FROM messages m
+       LEFT JOIN users s ON s.id = m.sender_id
+       WHERE m.receiver_id = ? AND m.status <> 'draft' AND m.read_at IS NULL
+       ORDER BY m.id DESC
        LIMIT 20`,
       [userId]
     );
@@ -287,7 +297,7 @@ module.exports = {
     );
     return result.affectedRows;
   },
-  async forward({ original_id, new_receiver_id, actor_id, reference_number, due_date = null }) {
+  async forward({ original_id, new_receiver_id, actor_id, reference_number, due_date = null, sender_name = null, receiver_name = null }) {
     // Copy message and assign new receiver
     const [original] = await pool.query('SELECT * FROM messages WHERE id = ?', [original_id]);
     if (!original[0]) throw new Error('Original message not found');
@@ -296,8 +306,8 @@ module.exports = {
       `INSERT INTO messages (
         sender_id, receiver_id, subject, content, raw_content, formatted_content, template_type,
         reference_number, status, file_path, file_name, file_mime, file_size, pdf_path,
-        department_id, parent_message_id, due_date, submitted_at, delivered_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
+        department_id, parent_message_id, due_date, sender_name, receiver_name, submitted_at, delivered_at, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW(), NOW())`,
       [
         actor_id,
         new_receiver_id,
@@ -315,7 +325,9 @@ module.exports = {
         msg.pdf_path,
         msg.department_id,
         msg.id,
-        due_date
+        due_date,
+        sender_name,
+        receiver_name
       ]
     );
     return result.insertId;
@@ -369,7 +381,9 @@ module.exports = {
   },
   async getById(id) {
     const [rows] = await pool.query(
-      `SELECT m.*, s.name AS sender_user_name, r.name AS receiver_user_name
+      `SELECT m.*,
+        COALESCE(m.sender_name, s.name) AS sender_name,
+        COALESCE(m.receiver_name, r.name) AS receiver_name
        FROM messages m
        LEFT JOIN users s ON s.id = m.sender_id
        LEFT JOIN users r ON r.id = m.receiver_id

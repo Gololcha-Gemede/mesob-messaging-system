@@ -231,7 +231,7 @@ export default function DashboardPage() {
         <div className="dashboard-hero-brand">
           <img className="dashboard-hero-logo" src="/qms-logo.png" alt="" width={72} height={72} />
           <div>
-            <span className="dashboard-kicker">MESOB IMMS</span>
+            <span className="dashboard-kicker">Mesob Connect</span>
             <h2>Welcome, {displayName}</h2>
             <p className="admin-panel-hint">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>

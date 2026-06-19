@@ -7,6 +7,7 @@ const { withLockedReference } = require('../services/referenceService');
 const { generateLetterPdf } = require('../services/pdfService');
 const { audit } = require('../utils/audit');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
+const sseService = require('../services/sseService');
 
 async function getUserDepartmentId(userId) {
   const [[row]] = await pool.query('SELECT department_id FROM users WHERE id = ?', [userId]);
@@ -224,6 +225,20 @@ exports.sendMessage = async (req, res) => {
       message_ids: createdMessages.map((message) => message.id),
       receiver_ids: selectedReceiverIds
     });
+
+    if (normalizedAction === 'submit') {
+      for (const msg of createdMessages) {
+        if (msg.receiver_id) {
+          sseService.sendToUser(msg.receiver_id, 'new_message', {
+            id: msg.id,
+            reference_number: msg.reference_number,
+            sender_name: sender?.name || 'Unknown',
+            subject: subjectTrimmed,
+            timestamp: new Date().toISOString()
+          });
+        }
+      }
+    }
   } catch (err) {
     res.status(500).json({ message: 'Error sending message', error: err.message });
   }
@@ -358,6 +373,7 @@ exports.markAsRead = async (req, res) => {
     if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
       return res.status(400).json({ message: 'Invalid message id' });
     }
+    const message = await messageModel.getById(id);
     const changed = await messageModel.markAsRead(id, req.user.id);
     if (changed) {
       await messageEventModel.create({
@@ -365,6 +381,14 @@ exports.markAsRead = async (req, res) => {
         event_type: 'opened',
         actor_id: req.user.id
       });
+      if (message && message.sender_id && message.sender_id !== req.user.id) {
+        sseService.sendToUser(message.sender_id, 'message_read', {
+          id: message.id,
+          reference_number: message.reference_number,
+          read_by: req.user.name || 'Someone',
+          timestamp: new Date().toISOString()
+        });
+      }
       return res.json({ message: 'Marked as opened' });
     }
     res.json({ message: 'Already marked as opened' });
@@ -458,30 +482,19 @@ exports.forwardMessage = async (req, res) => {
     const sender = await userModel.findById(req.user.id);
 
     for (const receiverId of selectedReceiverIds) {
+      const receiver = await userModel.findById(receiverId);
       const { messageId: newId, reference_number } = await withLockedReference(async (nextReference) => {
         const insertedId = await messageModel.forward({
           original_id: id,
           new_receiver_id: receiverId,
           actor_id: req.user.id,
           reference_number: nextReference,
-          due_date: due_date || null
+          due_date: due_date || null,
+          sender_name: sender?.name || null,
+          receiver_name: receiver?.name || null
         });
         return { messageId: insertedId, reference_number: nextReference };
       });
-      const receiver = await userModel.findById(receiverId);
-      const letterPayload = buildLetterPayload({
-        template_type: message.template_type,
-        reference_number,
-        sender,
-        receiver,
-        subject: message.subject,
-        content: message.raw_content || message.content,
-        // Attachments should be delivered separately (downloadable), not rendered inside the letter HTML.
-        attachments: []
-      });
-      const formatted_content = generateLetterHtml(letterPayload);
-      const pdf_path = await generateLetterPdf(letterPayload);
-      await messageModel.updateGeneratedFields(newId, { formatted_content, pdf_path });
       await messageEventModel.create({
         message_id: newId,
         event_type: 'forwarded',
