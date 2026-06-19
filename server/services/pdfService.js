@@ -1,8 +1,10 @@
 const fs = require('fs/promises');
 const path = require('path');
+const zlib = require('zlib');
 const { buildLetterData, formatDate } = require('./letterFormatter');
 
 const PDF_DIR = path.join(__dirname, '..', 'generated-pdfs');
+const ASSETS_DIR = path.join(__dirname, '..');
 const PAGE_WIDTH = 612;
 const PAGE_HEIGHT = 792;
 const LEFT = 62;
@@ -10,6 +12,8 @@ const RIGHT = 62;
 const TOP = 62;
 const BOTTOM = 62;
 const LINE_HEIGHT = 16;
+
+const HEADER_IMG_PATH = path.join(ASSETS_DIR, 'letter-header2.png');
 
 function escapePdfText(value) {
   return String(value ?? '')
@@ -42,38 +46,124 @@ function addWrapped(lines, text, options = {}) {
   wrapped.forEach((line) => lines.push({ text: line, font: options.font || 'regular', size: options.size || 11 }));
 }
 
+function parsePngChunks(buffer) {
+  const chunks = [];
+  let offset = 8; // skip PNG signature
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString('ascii', offset + 4, offset + 8);
+    const data = buffer.slice(offset + 8, offset + 8 + length);
+    chunks.push({ type, data });
+    offset += 12 + length; // 4 len + 4 type + data + 4 crc
+  }
+  return chunks;
+}
+
+function decodePngToRgb(pngBuffer) {
+  const chunks = parsePngChunks(pngBuffer);
+  const ihdr = chunks.find((c) => c.type === 'IHDR');
+  if (!ihdr) return null;
+
+  const width = ihdr.data.readUInt32BE(0);
+  const height = ihdr.data.readUInt32BE(4);
+  const bitDepth = ihdr.data[8];
+  const colorType = ihdr.data[9];
+
+  // Collect all IDAT chunk data
+  const idatChunks = chunks.filter((c) => c.type === 'IDAT');
+  const compressed = Buffer.concat(idatChunks.map((c) => c.data));
+  const raw = zlib.inflateSync(compressed);
+
+  // Determine bytes per pixel based on color type
+  let bytesPerPixel;
+  let channels;
+  switch (colorType) {
+    case 0: bytesPerPixel = 1; channels = 1; break; // grayscale
+    case 2: bytesPerPixel = 3; channels = 3; break; // RGB
+    case 3: bytesPerPixel = 1; channels = 1; break; // indexed
+    case 4: bytesPerPixel = 2; channels = 2; break; // grayscale + alpha
+    case 6: bytesPerPixel = 4; channels = 4; break; // RGBA
+    default: bytesPerPixel = 3; channels = 3; break;
+  }
+
+  const stride = 1 + width * bytesPerPixel;
+  const rgbData = Buffer.alloc(width * height * 3);
+
+  for (let y = 0; y < height; y++) {
+    const filterByte = raw[y * stride];
+    const rowStart = y * stride + 1;
+
+    for (let x = 0; x < width; x++) {
+      const srcIdx = rowStart + x * bytesPerPixel;
+      const dstIdx = (y * width + x) * 3;
+
+      if (colorType === 0 || colorType === 3) {
+        const val = raw[srcIdx] || 0;
+        rgbData[dstIdx] = val;
+        rgbData[dstIdx + 1] = val;
+        rgbData[dstIdx + 2] = val;
+      } else if (colorType === 2) {
+        rgbData[dstIdx] = raw[srcIdx] || 0;
+        rgbData[dstIdx + 1] = raw[srcIdx + 1] || 0;
+        rgbData[dstIdx + 2] = raw[srcIdx + 2] || 0;
+      } else if (colorType === 4) {
+        const val = raw[srcIdx] || 0;
+        rgbData[dstIdx] = val;
+        rgbData[dstIdx + 1] = val;
+        rgbData[dstIdx + 2] = val;
+      } else if (colorType === 6) {
+        rgbData[dstIdx] = raw[srcIdx] || 0;
+        rgbData[dstIdx + 1] = raw[srcIdx + 1] || 0;
+        rgbData[dstIdx + 2] = raw[srcIdx + 2] || 0;
+      }
+    }
+  }
+
+  return { width, height, rgbData };
+}
+
+async function loadHeaderImage() {
+  try {
+    const buf = await fs.readFile(HEADER_IMG_PATH);
+    return decodePngToRgb(buf);
+  } catch {
+    return null;
+  }
+}
+
 function letterLines(input) {
   const data = buildLetterData(input);
   const lines = [];
-  lines.push({ text: 'MESOB INTERNAL MESSAGING SYSTEM', font: 'bold', size: 16, center: true });
-  lines.push({ text: `${data.templateType.replace(/_/g, ' ').toUpperCase()} INTERNAL CORRESPONDENCE`, font: 'regular', size: 10, center: true });
-  lines.push({ spacer: 14 });
+  // Header is drawn as an image in the PDF stream; add spacing after it
+  lines.push({ spacer: 80 });
   if (data.templateType === 'official_letter') {
-    // removed top metadata (reference/date/from/to) per request
     lines.push({ text: `${data.recipientLine || data.recipientName}`, font: 'bold', size: 11 });
     lines.push({ spacer: 8 });
-    lines.push({ text: `ጉዳዩ፡- ${data.subject}`, font: 'bold', size: 12, center: true });
+    lines.push({ text: `Ref No: ${data.referenceNumber}`, font: 'regular', size: 10, alignRight: true });
+    lines.push({ text: `Date: ${formatDate(data.date)}`, font: 'regular', size: 10, alignRight: true });
+    lines.push({ spacer: 8 });
+    lines.push({ text: data.subject, font: 'bold', size: 13, center: true });
     lines.push({ spacer: 10 });
   } else {
-    // removed top metadata (reference/date/from/to) per request
     lines.push({ spacer: 8 });
     lines.push({ text: `Subject: ${data.subject}`, font: 'bold', size: 12 });
     lines.push({ spacer: 10 });
-  }
 
-  if (data.templateType === 'memo') {
-    lines.push({ text: 'MEMO', font: 'bold', size: 14, center: true });
+    if (data.templateType === 'memo') {
+      lines.push({ text: 'MEMO', font: 'bold', size: 14, center: true });
   } else if (data.templateType === 'notice') {
-    lines.push({ text: 'NOTICE', font: 'bold', size: 14, center: true });
-  } else if (data.templateType === 'circular') {
-    lines.push({ text: 'CIRCULAR', font: 'bold', size: 14, center: true });
-    lines.push({ text: 'Dear Team,', font: 'regular', size: 11 });
-  } else if (data.templateType === 'request_form') {
-    lines.push({ text: `Requested by: ${data.senderName}`, font: 'regular', size: 11 });
-    lines.push({ text: `Submitted to: ${data.recipientName}`, font: 'regular', size: 11 });
     lines.push({ spacer: 8 });
-  } else {
-    lines.push({ text: `Dear ${data.recipientName},`, font: 'regular', size: 11 });
+    lines.push({ text: `Ref No: ${data.referenceNumber}`, font: 'regular', size: 10, alignRight: true });
+    lines.push({ text: `Date: ${formatDate(data.date)}`, font: 'regular', size: 10, alignRight: true });
+    lines.push({ spacer: 8 });
+    lines.push({ text: data.subject, font: 'bold', size: 13, alignRight: true });
+    lines.push({ spacer: 10 });
+  } else if (data.templateType === 'circular') {
+      lines.push({ text: 'CIRCULAR', font: 'bold', size: 14, center: true });
+      lines.push({ text: 'Dear Team,', font: 'regular', size: 11 });
+    } else {
+      lines.push({ text: `Dear ${data.recipientName},`, font: 'regular', size: 11 });
+    }
   }
 
   String(data.body || '').split(/\n{2,}/).forEach((paragraph) => {
@@ -94,22 +184,37 @@ function letterLines(input) {
   lines.push({ spacer: 12 });
   if (data.templateType === 'official_letter') {
     lines.push({ text: 'ከሰላምታ ጋር', font: 'regular', size: 11, alignRight: true });
+    lines.push({ spacer: 4 });
+    lines.push({ text: 'Signature', font: 'regular', size: 10, alignRight: true });
+    lines.push({ spacer: 6 });
+    lines.push({ text: data.senderName, font: 'bold', size: 11, alignRight: true });
+    if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10, alignRight: true });
+  } else if (data.templateType === 'notice') {
+    lines.push({ text: data.senderName, font: 'bold', size: 11, alignRight: true });
+    if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10, alignRight: true });
+    lines.push({ spacer: 6 });
     lines.push({ text: 'Signature', font: 'regular', size: 10, alignRight: true });
   } else if (data.templateType === 'memo') {
     lines.push({ text: 'For your information and necessary action.', font: 'regular', size: 11 });
+    lines.push({ spacer: 12 });
+    lines.push({ text: data.senderName, font: 'bold', size: 11 });
+    if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10 });
   } else {
     lines.push({ text: 'Kind regards,', font: 'regular', size: 11 });
+    lines.push({ spacer: 12 });
+    lines.push({ text: data.senderName, font: 'bold', size: 11 });
+    if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10 });
   }
 
-  // Watermark (drawn near bottom center on each page via PDF stream)
-  // Keeping it lightweight: add text lines at the end so it shows without requiring PDF image support.
-  lines.push({ spacer: 18 });
-  lines.push({ text: 'MESOB', font: 'regular', size: 9, center: true, watermark: true });
-  lines.push({ spacer: 8 });
-  lines.push({ text: data.senderName, font: 'bold', size: 11 });
-  if (data.senderTitle) lines.push({ text: data.senderTitle, font: 'regular', size: 10 });
-  lines.push({ spacer: 16 });
-  lines.push({ text: 'Generated by MESOB Internal Messaging System', font: 'regular', size: 8, center: true });
+  // Footer
+  lines.push({ spacer: 24 });
+  lines.push({ text: '─────────────────────────────────────────────────────────────', font: 'regular', size: 8, center: true });
+  lines.push({ spacer: 4 });
+  lines.push({ text: 'Lideta Address: Burundi Street, Addis Ababa, Ethiopia', font: 'regular', size: 8, center: true });
+  lines.push({ text: 'Contact Center: 9838 | Website: www.mesobcenter.net', font: 'regular', size: 8, center: true });
+  lines.push({ spacer: 4 });
+  lines.push({ text: 'The New Horizon Of Service!', font: 'bold', size: 9, center: true });
+
   return lines;
 }
 
@@ -153,16 +258,7 @@ function streamForPage(lines) {
     const approxWidth = String(line.text || '').length * size * 0.48;
     const x = line.center ? Math.max(LEFT, (PAGE_WIDTH - approxWidth) / 2) : (line.alignRight ? Math.max(LEFT, PAGE_WIDTH - RIGHT - approxWidth) : LEFT);
 
-    // Optional watermark styling (light gray)
-    if (line.watermark) {
-      commands.push('0.75 0.75 0.75 rg');
-    }
-
     commands.push(`BT /${font} ${size} Tf ${x.toFixed(2)} ${y.toFixed(2)} Td (${escapePdfText(line.text)}) Tj ET`);
-
-    if (line.watermark) {
-      commands.push('0 0 0 rg');
-    }
 
     y -= Math.max(LINE_HEIGHT, size + 5);
   });
@@ -170,7 +266,7 @@ function streamForPage(lines) {
   return commands.join('\n');
 }
 
-function buildPdf(pages) {
+function buildPdf(pages, headerImage) {
   const objects = [];
   const addObject = (content) => {
     objects.push(content);
@@ -181,12 +277,39 @@ function buildPdf(pages) {
   const pagesId = addObject('');
   const fontRegularId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');
   const fontBoldId = addObject('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+
+  let imageObjectId = 0;
+  let imageWidth = 0;
+  let imageHeight = 0;
+
+  if (headerImage) {
+    imageWidth = headerImage.width;
+    imageHeight = headerImage.height;
+    const imgStream = headerImage.rgbData;
+    imageObjectId = addObject(
+      `<< /Type /XObject /Subtype /Image /Width ${imageWidth} /Height ${imageHeight} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /FlateDecode /Length ${Buffer.byteLength(imgStream)} >>\nstream\n${imgStream}\nendstream`
+    );
+  }
+
   const pageIds = [];
 
   pages.forEach((pageLines) => {
-    const stream = streamForPage(pageLines);
+    let stream = streamForPage(pageLines);
+
+    if (headerImage && imageObjectId) {
+      const imgDisplayWidth = PAGE_WIDTH - 44;
+      const imgDisplayHeight = (imageHeight / imageWidth) * imgDisplayWidth;
+      const imgY = PAGE_HEIGHT - 46 - imgDisplayHeight;
+
+      const imageCmd = `q ${imgDisplayWidth.toFixed(2)} 0 0 ${imgDisplayHeight.toFixed(2)} 44 ${imgY.toFixed(2)} cm /Im0 Do Q`;
+      stream = imageCmd + '\n' + stream;
+    }
+
     const contentId = addObject(`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`);
-    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources << /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >> /Contents ${contentId} 0 R >>`);
+    const pageResources = headerImage && imageObjectId
+      ? `<< /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> /XObject << /Im0 ${imageObjectId} 0 R >> >>`
+      : `<< /Font << /F1 ${fontRegularId} 0 R /F2 ${fontBoldId} 0 R >> >>`;
+    const pageId = addObject(`<< /Type /Page /Parent ${pagesId} 0 R /MediaBox [0 0 ${PAGE_WIDTH} ${PAGE_HEIGHT}] /Resources ${pageResources} /Contents ${contentId} 0 R >>`);
     pageIds.push(pageId);
   });
 
@@ -214,8 +337,9 @@ async function generateLetterPdf(input) {
   const reference = String(input.referenceNumber || `message-${Date.now()}`).replace(/[^a-z0-9-]/gi, '_');
   const fileName = `${reference}.pdf`;
   const filePath = path.join(PDF_DIR, fileName);
+  const headerImage = await loadHeaderImage();
   const pages = paginate(letterLines(input));
-  await fs.writeFile(filePath, buildPdf(pages));
+  await fs.writeFile(filePath, buildPdf(pages, headerImage));
   return filePath;
 }
 

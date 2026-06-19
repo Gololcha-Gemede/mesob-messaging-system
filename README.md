@@ -78,3 +78,5 @@ Modifications
 - Remove unnecessary texts from the compose page and draft page like 'Auto-saved 58 minutes ago' and others
 - remove forward note field when forwarding a message
 - status?
+
+-> Download not working, Remove request form template?, move signature straightly below keselamta gar

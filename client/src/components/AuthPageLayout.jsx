@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 
-const QMS_LOGO = '/qms-logo.png';
+const QMS_LOGO = '/mesoblogo.webp';
 
 function IconEmail() {
   return (

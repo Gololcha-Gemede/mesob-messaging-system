@@ -1,6 +1,6 @@
 import { forwardRef } from 'react';
 
-const LOGO_SRC = '/qms-logo.png';
+const LOGO_SRC = '/letter-header2.png';
 
 function formatDate(value) {
   if (!value) return new Date().toLocaleDateString();
@@ -21,12 +21,8 @@ const FormalLetterTemplate = forwardRef(function FormalLetterTemplate({
 }, ref) {
   return (
     <article className="formal-letter-template" ref={ref}>
-      <header className="formal-letter-header">
-        <img className="formal-letter-logo" src={LOGO_SRC} alt="" />
-        <div>
-          <h1>MESOB Internal Message Management System</h1>
-          <p>Official Correspondence</p>
-        </div>
+      <header className="letter-header">
+        <img src={LOGO_SRC} alt="A-MESOB Lideta Center" />
       </header>
 
       <section className="formal-letter-meta">
@@ -66,9 +62,17 @@ const FormalLetterTemplate = forwardRef(function FormalLetterTemplate({
         <p>{signatureSection || senderNameTitle || 'Signature section'}</p>
       </section>
 
-      <footer className="formal-letter-footer">
-        <span>MESOB IMMS</span>
-        <span>Generated formal letter correspondence</span>
+      <footer className="letter-footer">
+        <div className="letter-footer-content">
+          <div className="letter-footer-info">
+            <div>Lideta Address: Burundi Street, Addis Ababa, Ethiopia</div>
+            <div>Contact Center : 9838</div>
+            <div>Tell :</div>
+            <div>PoBox :</div>
+            <div>Website : www.mesobcenter.net</div>
+          </div>
+          <div className="letter-footer-tagline">The New Horizon Of Service!</div>
+        </div>
       </footer>
     </article>
   );

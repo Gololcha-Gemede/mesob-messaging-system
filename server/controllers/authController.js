@@ -15,12 +15,12 @@ exports.login = async (req, res) => {
   const user = await userModel.findByEmail(email);
   if (!user) {
     audit('login_failed', req, { email: String(email || '').toLowerCase(), reason: 'unknown_user' });
-    return res.status(400).json({ message: 'Invalid credentials' });
+    return res.status(400).json({ message: 'No account found with this email' });
   }
   const valid = await bcrypt.compare(password, user.password);
   if (!valid) {
     audit('login_failed', req, { user_id: user.id, reason: 'bad_password' });
-    return res.status(400).json({ message: 'Invalid credentials' });
+    return res.status(400).json({ message: 'Incorrect password' });
   }
   const token = jwt.sign({ id: user.id, role: user.role, department_id: user.department_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
   audit('login_success', req, { user_id: user.id });

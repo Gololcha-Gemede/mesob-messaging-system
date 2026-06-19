@@ -198,9 +198,6 @@ export default function MessageDetailPage() {
         {message.due_date && <div><strong>Due date:</strong> {String(message.due_date).slice(0, 10)}</div>}
       </div>
       <div className="document-action-row">
-        <button type="button" className="attachment-link-button" onClick={handlePdfDownload} disabled={isDownloadingPdf}>
-          {isDownloadingPdf ? 'Downloading PDF...' : 'Download PDF'}
-        </button>
         <button type="button" className="secondary-btn print-letter-btn" onClick={handlePrintLetter}>
           Print Letter
         </button>

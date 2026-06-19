@@ -459,7 +459,7 @@ export default function NavUserMenus({ token }) {
         {profileOpen ? (
           <div className="top-popover top-popover--profile" role="dialog" aria-label="Account">
             {editingProfile ? (
-              <form className="profile-edit-form profile-edit-form--refined" onSubmit={saveProfile}>
+              <form className="profile-edit-form" onSubmit={saveProfile}>
                 <div className="nav-popover-header">
                   <h3>Edit profile</h3>
                   <button
@@ -475,56 +475,70 @@ export default function NavUserMenus({ token }) {
                     <Icon name="close" />
                   </button>
                 </div>
-                <div className="profile-edit-avatar-row">
-                  {profilePhoto ? (
-                    <img className="profile-popover-avatar" src={profilePhoto} alt="" />
-                  ) : (
-                    <span className="profile-popover-avatar profile-popover-avatar--fallback">
-                      {getProfileInitial({ name: profileForm.name, email: profileForm.email })}
-                    </span>
-                  )}
-                  <label className="profile-file-field profile-file-field--compact">
-                    <span>Change photo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) => setProfileForm((form) => ({ ...form, profile_image: e.target.files?.[0] || null }))}
-                    />
+                <div className="profile-edit-avatar-section">
+                  <div className="profile-edit-avatar-wrapper">
+                    {profilePhoto ? (
+                      <img className="profile-edit-avatar-img" src={profilePhoto} alt="" />
+                    ) : (
+                      <span className="profile-edit-avatar-fallback">
+                        {getProfileInitial({ name: profileForm.name, email: profileForm.email })}
+                      </span>
+                    )}
+                    <label className="profile-edit-avatar-overlay">
+                      <Icon name="user" />
+                      <span>Change</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setProfileForm((form) => ({ ...form, profile_image: e.target.files?.[0] || null }))}
+                      />
+                    </label>
+                  </div>
+                </div>
+                <div className="profile-edit-fields">
+                  <label className="profile-field">
+                    <span className="profile-field-label">Full name</span>
+                    <div className="profile-field-input-wrapper">
+                      <Icon name="user" />
+                      <input
+                        type="text"
+                        value={profileForm.name}
+                        onChange={(e) => setProfileForm((form) => ({ ...form, name: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </label>
+                  <label className="profile-field">
+                    <span className="profile-field-label">Email address</span>
+                    <div className="profile-field-input-wrapper">
+                      <Icon name="mail" />
+                      <input
+                        type="email"
+                        value={profileForm.email}
+                        onChange={(e) => setProfileForm((form) => ({ ...form, email: e.target.value }))}
+                        required
+                      />
+                    </div>
+                  </label>
+                  <label className="profile-field">
+                    <span className="profile-field-label">New password</span>
+                    <div className="profile-field-input-wrapper">
+                      <Icon name="lock" />
+                      <input
+                        type="password"
+                        placeholder="Leave blank to keep current"
+                        value={profileForm.password}
+                        onChange={(e) => setProfileForm((form) => ({ ...form, password: e.target.value }))}
+                        autoComplete="new-password"
+                      />
+                    </div>
                   </label>
                 </div>
-                <label className="nav-field">
-                  <span>Name</span>
-                  <input
-                    type="text"
-                    value={profileForm.name}
-                    onChange={(e) => setProfileForm((form) => ({ ...form, name: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="nav-field">
-                  <span>Email</span>
-                  <input
-                    type="email"
-                    value={profileForm.email}
-                    onChange={(e) => setProfileForm((form) => ({ ...form, email: e.target.value }))}
-                    required
-                  />
-                </label>
-                <label className="nav-field">
-                  <span>New password</span>
-                  <input
-                    type="password"
-                    placeholder="Leave blank to keep current"
-                    value={profileForm.password}
-                    onChange={(e) => setProfileForm((form) => ({ ...form, password: e.target.value }))}
-                    autoComplete="new-password"
-                  />
-                </label>
-                <div className="profile-action-row profile-action-row--refined">
-                  <button type="submit" disabled={profileSaving}>
+                <div className="profile-edit-actions">
+                  <button type="submit" className="profile-save-btn" disabled={profileSaving}>
                     {profileSaving ? 'Saving...' : 'Save changes'}
                   </button>
-                  <button type="button" className="secondary-btn" onClick={cancelEditProfile}>
+                  <button type="button" className="profile-cancel-btn" onClick={cancelEditProfile}>
                     Cancel
                   </button>
                 </div>
@@ -566,16 +580,6 @@ export default function NavUserMenus({ token }) {
                   <button type="button" className="nav-popover-action-btn" onClick={startEditProfile}>
                     Edit profile
                   </button>
-                  <Link
-                    to="/"
-                    className="nav-popover-action-btn nav-popover-action-btn--link"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      setPinnedMenu(null);
-                    }}
-                  >
-                    Dashboard
-                  </Link>
                   <button type="button" className="nav-popover-action-btn nav-popover-action-btn--logout" onClick={logout}>
                     Sign out
                   </button>
