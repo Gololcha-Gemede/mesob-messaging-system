@@ -2,10 +2,17 @@ const departmentModel = require('../models/department');
 
 exports.createDepartment = async (req, res) => {
   try {
-    const { name } = req.body;
-    const deptId = await departmentModel.create(name);
+    const { name, code } = req.body;
+    const trimmedCode = code ? String(code).trim().toUpperCase() : null;
+    if (trimmedCode && trimmedCode.length > 10) {
+      return res.status(400).json({ message: 'Department code must be 10 characters or fewer' });
+    }
+    const deptId = await departmentModel.create(name, trimmedCode);
     res.status(201).json({ id: deptId });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'A department with this code already exists' });
+    }
     res.status(500).json({ message: 'Error creating department', error: err.message });
   }
 };
@@ -23,17 +30,21 @@ exports.updateDepartment = async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!id) return res.status(400).json({ message: 'Invalid department id' });
-    const { name } = req.body;
-    if (!name || !String(name).trim()) {
-      return res.status(400).json({ message: 'Name is required' });
+    const { name, code } = req.body;
+    const trimmedCode = code ? String(code).trim().toUpperCase() : null;
+    if (trimmedCode && trimmedCode.length > 10) {
+      return res.status(400).json({ message: 'Department code must be 10 characters or fewer' });
     }
     const depts = await departmentModel.getAll();
     if (!depts.some((d) => d.id === id)) {
       return res.status(404).json({ message: 'Department not found' });
     }
-    await departmentModel.update(id, String(name).trim());
+    await departmentModel.update(id, String(name).trim(), trimmedCode);
     res.json({ message: 'Department updated' });
   } catch (err) {
+    if (err.code === 'ER_DUP_ENTRY') {
+      return res.status(400).json({ message: 'A department with this code already exists' });
+    }
     res.status(500).json({ message: 'Error updating department', error: err.message });
   }
 };

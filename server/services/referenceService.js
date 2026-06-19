@@ -1,25 +1,36 @@
 const pool = require('../models/db');
+const departmentModel = require('../models/department');
 
-function padNumber(value, size = 6) {
+function padNumber(value, size = 3) {
   return String(value).padStart(size, '0');
 }
 
-async function nextReferenceNumber(year = new Date().getFullYear()) {
-  const prefix = `IMS-${year}-`;
+async function nextReferenceNumber(departmentId, year = new Date().getFullYear()) {
+  let deptCode = 'GEN';
+  if (departmentId) {
+    const dept = await departmentModel.getById(departmentId);
+    if (dept?.code) deptCode = String(dept.code).toUpperCase().trim();
+  }
+
+  const suffix = `/${year}`;
   const [rows] = await pool.query(
     `SELECT reference_number
      FROM messages
      WHERE reference_number LIKE ?
      ORDER BY reference_number DESC
      LIMIT 1`,
-    [`${prefix}%`]
+    [`${deptCode}/%${suffix}`]
   );
-  const lastNumber = Number(String(rows[0]?.reference_number || '').split('-').pop());
+
+  const lastRef = rows[0]?.reference_number || '';
+  const middlePart = lastRef.split('/')[1] || '';
+  const lastNumber = Number(middlePart);
   const nextNumber = Number.isInteger(lastNumber) ? lastNumber + 1 : 1;
-  return `${prefix}${padNumber(nextNumber)}`;
+
+  return `${deptCode}/${padNumber(nextNumber)}/${year}`;
 }
 
-async function withLockedReference(callback) {
+async function withLockedReference(callback, departmentId) {
   const year = new Date().getFullYear();
   const lockName = `message-reference-${year}`;
   const [[lockResult]] = await pool.query('SELECT GET_LOCK(?, 10) AS locked', [lockName]);
@@ -28,7 +39,7 @@ async function withLockedReference(callback) {
   }
 
   try {
-    const referenceNumber = await nextReferenceNumber(year);
+    const referenceNumber = await nextReferenceNumber(departmentId, year);
     return await callback(referenceNumber);
   } finally {
     await pool.query('SELECT RELEASE_LOCK(?)', [lockName]);

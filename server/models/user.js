@@ -57,7 +57,7 @@ module.exports = {
   async getRecipients({ query, excludeUserId }) {
     let sql = `
       SELECT u.id, u.name, u.email, u.role, u.department_id, u.profile_image_path,
-             u.position_title, u.signature_image_path, d.name AS department_name
+             u.position_title, u.signature_image_path, d.name AS department_name, d.code AS department_code
       FROM users u
       LEFT JOIN departments d ON d.id = u.department_id
       WHERE u.id != ?`;

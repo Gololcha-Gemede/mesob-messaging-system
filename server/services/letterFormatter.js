@@ -249,7 +249,7 @@ function normalizeTemplateType(templateType) {
 function buildLetterData(input = {}) {
   return {
     templateType: normalizeTemplateType(input.templateType),
-    referenceNumber: input.referenceNumber || 'IMS-PREVIEW',
+    referenceNumber: input.referenceNumber || `REF/000/PREVIEW`,
     date: input.date || new Date(),
     senderName: input.senderName || 'Sender',
     senderTitle: input.senderTitle || '',

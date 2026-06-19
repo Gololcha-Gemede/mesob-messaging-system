@@ -183,7 +183,7 @@ export function buildClientLetterPreview({ templateType, recipientName, subject,
       ${header()}
       <section class="letter-top-meta">
         <div class="letter-top-meta__stack notice-meta">
-          <div>ቁጥር/Ref no: IMS-${new Date().getFullYear()}-PREVIEW</div>
+          <div>ቁጥር/Ref no: REF/000/PREVIEW</div>
           <div>ቀን/Date : ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
         </div>
       </section>
@@ -193,7 +193,7 @@ export function buildClientLetterPreview({ templateType, recipientName, subject,
   } else {
     body = `
       ${header()}
-      ${officialLetterMeta({ referenceNumber: `IMS-${new Date().getFullYear()}-PREVIEW`, date: new Date(), recipientLine: recipientName })}
+      ${officialLetterMeta({ referenceNumber: 'REF/000/PREVIEW', date: new Date(), recipientLine: recipientName })}
       <section class="letter-subject-line"><span>ጉዳዩ፡-</span><strong>${safeSubject}</strong></section>
       <section class="letter-body">${paragraphs(content)}</section>
     `;

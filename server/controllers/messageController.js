@@ -141,7 +141,7 @@ async function createGeneratedMessage(payload, { sender, receiver, attachments, 
       pdf_path
     });
     return { messageId, reference_number, formatted_content, pdf_path };
-  });
+  }, payload.department_id);
 }
 
 exports.sendMessage = async (req, res) => {
@@ -252,7 +252,7 @@ exports.previewMessage = async (req, res) => {
     const receiverNameTrimmed = typeof receiver_name === 'string' ? receiver_name.trim() : '';
 
     const receiver = selectedReceiverIds[0] ? await userModel.findById(selectedReceiverIds[0]) : null;
-    const reference_number = `IMS-${new Date().getFullYear()}-PREVIEW`;
+    const reference_number = `REF/000/PREVIEW`;
     const letterPayload = buildLetterPayload({
       template_type,
       reference_number,
@@ -494,7 +494,7 @@ exports.forwardMessage = async (req, res) => {
           receiver_name: receiver?.name || null
         });
         return { messageId: insertedId, reference_number: nextReference };
-      });
+      }, req.user.department_id);
       await messageEventModel.create({
         message_id: newId,
         event_type: 'forwarded',

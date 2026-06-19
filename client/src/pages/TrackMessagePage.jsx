@@ -74,7 +74,7 @@ export default function TrackMessagePage() {
         <input
           id="track-reference"
           type="search"
-          placeholder="Example: HR-2026-0001"
+          placeholder="Example: HRD/001/2026"
           value={reference}
           onChange={(e) => setReference(e.target.value)}
           autoComplete="off"

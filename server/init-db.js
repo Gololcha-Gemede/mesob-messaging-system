@@ -36,6 +36,7 @@ async function initDatabase() {
       CREATE TABLE IF NOT EXISTS departments (
         id INT AUTO_INCREMENT PRIMARY KEY,
         name VARCHAR(255) NOT NULL,
+        code VARCHAR(10) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
@@ -104,7 +105,7 @@ async function initDatabase() {
 
     // Insert sample data
     await connection.query(`
-      INSERT IGNORE INTO departments (id, name) VALUES (1, 'Information Technology'), (2, 'Human Resources'), (3, 'Finance')
+      INSERT IGNORE INTO departments (id, name, code) VALUES (1, 'Information Technology', 'IT'), (2, 'Human Resources', 'HRD'), (3, 'Finance', 'FIN')
     `);
 
     await connection.query(`

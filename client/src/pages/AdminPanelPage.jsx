@@ -9,8 +9,10 @@ export default function AdminPanelPage() {
   const [users, setUsers] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [deptName, setDeptName] = useState('');
+  const [deptCode, setDeptCode] = useState('');
   const [editingDeptId, setEditingDeptId] = useState(null);
   const [editingDeptName, setEditingDeptName] = useState('');
+  const [editingDeptCode, setEditingDeptCode] = useState('');
   const [editingUser, setEditingUser] = useState(null);
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(null);
   const activeSection = searchParams.get('section') === 'departments' ? 'departments' : 'users';
@@ -63,8 +65,9 @@ export default function AdminPanelPage() {
   const handleDeptSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('/api/departments', { name: deptName }, authHeaders());
+      const res = await axios.post('/api/departments', { name: deptName, code: deptCode }, authHeaders());
       setDeptName('');
+      setDeptCode('');
       setSelectedDepartmentId(res.data?.id ?? null);
       await loadData();
     } catch {
@@ -75,6 +78,7 @@ export default function AdminPanelPage() {
   const startEditDept = (d) => {
     setEditingDeptId(d.id);
     setEditingDeptName(d.name);
+    setEditingDeptCode(d.code || '');
   };
 
   const cancelEditDept = () => {
@@ -84,7 +88,7 @@ export default function AdminPanelPage() {
 
   const saveDept = async (id) => {
     try {
-      await axios.put(`/api/departments/${id}`, { name: editingDeptName }, authHeaders());
+      await axios.put(`/api/departments/${id}`, { name: editingDeptName, code: editingDeptCode }, authHeaders());
       cancelEditDept();
       await loadData();
     } catch {
@@ -331,6 +335,7 @@ export default function AdminPanelPage() {
 
           <form className="admin-create-dept-form" onSubmit={handleDeptSubmit}>
             <input type="text" placeholder="Department Name" value={deptName} onChange={(e) => setDeptName(e.target.value)} required />
+            <input type="text" placeholder="Code (e.g. HRD)" value={deptCode} onChange={(e) => setDeptCode(e.target.value)} maxLength={10} style={{ maxWidth: 140 }} />
             <button type="submit">Create Department</button>
           </form>
 
@@ -351,7 +356,7 @@ export default function AdminPanelPage() {
                         if (editingDeptId !== d.id) cancelEditDept();
                       }}
                     >
-                      <span>{d.name}</span>
+                      <span>{d.code ? `[${d.code}] ` : ''}{d.name}</span>
                       <strong>{deptUsers.length}</strong>
                     </button>
                   );
@@ -366,9 +371,12 @@ export default function AdminPanelPage() {
                   <div className="department-card-header">
                     <div>
                       {editingDeptId === selectedDepartment.id ? (
-                        <input className="admin-inline-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} />
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                          <input className="admin-inline-input" value={editingDeptName} onChange={(e) => setEditingDeptName(e.target.value)} style={{ flex: 1 }} />
+                          <input className="admin-inline-input" value={editingDeptCode} onChange={(e) => setEditingDeptCode(e.target.value)} placeholder="Code" maxLength={10} style={{ width: 90 }} />
+                        </div>
                       ) : (
-                        <h4>{selectedDepartment.name}</h4>
+                        <h4>{selectedDepartment.code ? `[${selectedDepartment.code}] ` : ''}{selectedDepartment.name}</h4>
                       )}
                       <p className="admin-panel-hint">{selectedDepartmentUsers.length} user(s) assigned to this department.</p>
                     </div>

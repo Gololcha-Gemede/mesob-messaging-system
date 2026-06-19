@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS departments (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(255) NOT NULL,
+  code VARCHAR(10) NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -76,10 +77,11 @@ CREATE TABLE IF NOT EXISTS message_events (
 
 -- Create indexes
 CREATE UNIQUE INDEX uniq_reference_number ON messages (reference_number);
+CREATE UNIQUE INDEX uniq_dept_code ON departments (code);
 CREATE INDEX idx_message_events_message_id ON message_events (message_id);
 
 -- Insert sample data
-INSERT IGNORE INTO departments (id, name) VALUES (1, 'Information Technology'), (2, 'Human Resources'), (3, 'Finance');
+INSERT IGNORE INTO departments (id, name, code) VALUES (1, 'Information Technology', 'IT'), (2, 'Human Resources', 'HRD'), (3, 'Finance', 'FIN');
 
 INSERT IGNORE INTO users (id, name, email, password, role, department_id) VALUES 
 (1, 'Admin User', 'admin@example.com', '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj6ukx.LFvOe', 'admin', 1),

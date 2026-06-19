@@ -48,6 +48,13 @@ async function initSchema() {
   await ensureColumn('messages', 'read_at', 'read_at DATETIME NULL');
   await ensureColumn('messages', 'parent_message_id', 'parent_message_id INT NULL');
   await ensureColumn('messages', 'due_date', 'due_date DATE NULL');
+
+  await ensureColumn('departments', 'code', 'code VARCHAR(10) NULL');
+
+  const [deptCodeIndex] = await pool.query("SHOW INDEX FROM departments WHERE Key_name = 'uniq_dept_code'");
+  if (!deptCodeIndex.length) {
+    await pool.query('CREATE UNIQUE INDEX uniq_dept_code ON departments (code)');
+  }
   await ensureColumn('messages', 'created_at', 'created_at DATETIME NULL');
   await ensureColumn('messages', 'raw_content', 'raw_content TEXT NULL');
   await ensureColumn('messages', 'formatted_content', 'formatted_content MEDIUMTEXT NULL');

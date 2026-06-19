@@ -65,6 +65,19 @@ function buildLastSixMonths(rows = []) {
   });
 }
 
+function buildCurrentMonthDays(rows = []) {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const byDay = new Map(rows.map((item) => [normalizeDayKey(item.day), numberValue(item.count)]));
+  return Array.from({ length: daysInMonth }).map((_, i) => {
+    const day = i + 1;
+    const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    return { day: key, label: String(day), count: byDay.get(key) || 0 };
+  });
+}
+
 function buildLastSevenDays(rows = []) {
   const byDay = new Map(rows.map((item) => [normalizeDayKey(item.day), numberValue(item.count)]));
   return Array.from({ length: 7 }).map((_, index) => {
@@ -79,43 +92,84 @@ function buildLastSevenDays(rows = []) {
   });
 }
 
-function BarChart({ items, max, label }) {
+function LineChart({ items, max, label }) {
   const hasData = items.some((item) => numberValue(item.count) > 0);
+  if (!hasData) {
+    return <div className="dashboard-chart-empty">No message volume for this period yet.</div>;
+  }
+
+  const width = 500;
+  const height = 210;
+  const padTop = 30;
+  const padBottom = 34;
+  const padLeft = 6;
+  const padRight = 6;
+  const chartW = width - padLeft - padRight;
+  const chartH = height - padTop - padBottom;
+  const barGap = Math.max(8, Math.min(20, chartW / items.length * 0.3));
+  const barW = Math.max(18, (chartW - barGap * (items.length + 1)) / items.length);
+  const radius = Math.min(8, barW / 2.5);
 
   return (
-    <div className="mini-chart dashboard-chart dashboard-chart--animated" aria-label={label}>
-      {hasData ? (
-        items.map((item) => {
-          const height = Math.max(8, (numberValue(item.count) / max) * 100);
+    <div className="vbar-chart" aria-label={label}>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="xMidYMid meet">
+        <defs>
+          <linearGradient id="vbarGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#6b82e6" />
+            <stop offset="100%" stopColor="var(--qms-blue)" />
+          </linearGradient>
+          <linearGradient id="vbarGradHover" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#8a9ef0" />
+            <stop offset="100%" stopColor="#5a72d4" />
+          </linearGradient>
+          <filter id="vbarShadow" x="-10%" y="-5%" width="120%" height="115%">
+            <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="rgba(49,78,161,0.18)" />
+          </filter>
+        </defs>
+        {Array.from({ length: 5 }).map((_, i) => {
+          const y = padTop + (i / 4) * chartH;
+          return <line key={i} x1={padLeft} y1={y} x2={width - padRight} y2={y} stroke="#eef1f8" strokeWidth="1" strokeDasharray="4 3" />;
+        })}
+        {items.map((item, i) => {
+          const val = numberValue(item.count);
+          const barH = Math.max(4, (val / max) * chartH);
+          const x = padLeft + barGap + i * (barW + barGap);
+          const y = padTop + chartH - barH;
           return (
-            <div className="mini-chart-bar dashboard-chart-bar" key={item.day || item.month}>
-              <span style={{ height: `${height}%` }} title={`${item.count} messages`}>
-                <i>{item.count}</i>
-              </span>
-              <small>{item.label}</small>
-            </div>
+            <g key={item.day || item.month} className="vbar-col">
+              <rect
+                x={x}
+                y={y}
+                width={barW}
+                height={barH}
+                rx={radius}
+                ry={radius}
+                fill="url(#vbarGrad)"
+                filter="url(#vbarShadow)"
+                className="vbar-rect"
+              />
+              <text x={x + barW / 2} y={y - 8} textAnchor="middle" className="vbar-val">{val}</text>
+              <text x={x + barW / 2} y={height - 10} textAnchor="middle" className="vbar-lbl">{item.label}</text>
+            </g>
           );
-        })
-      ) : (
-        <div className="dashboard-chart-empty">No message volume for this period yet.</div>
-      )}
+        })}
+      </svg>
     </div>
   );
 }
 
-function StatisticsToggle({ weeklyStats, monthlyStats, maxWeekly, maxMonthly, enterDelay }) {
+function StatisticsToggle({ weeklyStats, monthlyStats, dailyThisMonth, maxWeekly, maxMonthly, maxDaily, enterDelay }) {
   const [statsView, setStatsView] = useState('weekly');
-  const last3Months = useMemo(() => monthlyStats.slice(-3), [monthlyStats]);
   const options = [
     { id: 'weekly', label: 'Weekly' },
-    { id: 'monthly', label: 'Monthly' },
-    { id: '3months', label: '3 Months' }
+    { id: '3months', label: '3 Months' },
+    { id: 'monthly', label: '6 Months' }
   ];
 
   const viewData = {
     weekly: { items: weeklyStats, max: maxWeekly, label: 'Last 7 days' },
     monthly: { items: monthlyStats, max: maxMonthly, label: 'Last 6 months' },
-    '3months': { items: last3Months, max: Math.max(1, ...last3Months.map(m => m.count)), label: 'Last 3 months' }
+    '3months': { items: monthlyStats.slice(-3), max: Math.max(1, ...monthlyStats.slice(-3).map(m => m.count)), label: 'Last 3 months' }
   };
 
   const current = viewData[statsView];
@@ -161,7 +215,7 @@ function StatisticsToggle({ weeklyStats, monthlyStats, maxWeekly, maxMonthly, en
           <strong>{currentPeak ? `${currentPeak.label} · ${numberValue(currentPeak.count)}` : 'None'}</strong>
         </div>
       </div>
-      <BarChart items={current.items} max={current.max} label={`${current.label} message statistics`} />
+      <LineChart items={current.items} max={current.max} label={`${current.label} message statistics`} />
     </section>
   );
 }
@@ -183,6 +237,7 @@ export default function DashboardPage() {
     last_month: 0,
     weekly_stats: [],
     monthly_stats: [],
+    daily_this_month: [],
     recent_activity: []
   });
   const [error, setError] = useState('');
@@ -191,14 +246,16 @@ export default function DashboardPage() {
 
   const weeklyStats = useMemo(() => buildLastSevenDays(counts.weekly_stats), [counts.weekly_stats]);
   const monthlyStats = useMemo(() => buildLastSixMonths(counts.monthly_stats), [counts.monthly_stats]);
+  const dailyThisMonth = useMemo(() => buildCurrentMonthDays(counts.daily_this_month), [counts.daily_this_month]);
   const maxWeekly = Math.max(1, ...weeklyStats.map((item) => item.count));
   const maxMonthly = Math.max(1, ...monthlyStats.map((item) => item.count));
+  const maxDaily = Math.max(1, ...dailyThisMonth.map((item) => item.count));
   const displayName = profileName || 'User';
 
 
 
   const cards = [
-    { key: 'total_messages', label: 'Total Messages', icon: 'TM', value: counts.total_messages, tone: 'blue', hint: `${compactNumber(counts.this_month)} this month` },
+    { key: 'total_messages', label: 'Total Messages', icon: 'TM', value: counts.total_messages, tone: 'blue', hint: '' },
     { key: 'sent', label: 'Sent', icon: 'SE', value: counts.sent, tone: 'green', hint: 'Outbound letters' },
     { key: 'received', label: 'Received', icon: 'RC', value: counts.received ?? counts.inbox, tone: 'gold', hint: `${counts.unread} unread` },
     { key: 'drafts', label: 'Drafts', icon: 'DR', value: counts.drafts, tone: 'slate', hint: 'Not submitted' }
@@ -260,8 +317,10 @@ export default function DashboardPage() {
         <StatisticsToggle
           weeklyStats={weeklyStats}
           monthlyStats={monthlyStats}
+          dailyThisMonth={dailyThisMonth}
           maxWeekly={maxWeekly}
           maxMonthly={maxMonthly}
+          maxDaily={maxDaily}
           enterDelay={loginEnter ? '0.38s' : undefined}
         />
 
