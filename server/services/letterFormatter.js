@@ -193,7 +193,7 @@ function memo(data) {
 function noticeClosing(data) {
   const signatureImage = data.signatureImagePath
     ? `<img class="letter-signature-image" src="${escapeHtml(data.signatureImagePath)}" alt="${escapeHtml(data.senderName)} signature">`
-    : '';
+    : '<span class="letter-signature-placeholder">Signature</span>';
   const title = data.senderTitle ? `<span>${escapeHtml(data.senderTitle)}</span>` : '';
   return `
     <section class="letter-signature notice-closing">

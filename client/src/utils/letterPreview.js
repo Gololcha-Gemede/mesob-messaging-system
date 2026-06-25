@@ -103,7 +103,7 @@ function signatureSection({ senderName, senderTitle, signatureImagePath }) {
 function noticeClosingSection({ senderName, senderTitle, signatureImagePath }) {
   const signatureImage = signatureImagePath
     ? `<img class="letter-signature-image" src="${escapeHtml(signatureImagePath)}" alt="${escapeHtml(senderName || 'Current user')} signature">`
-    : '';
+    : '<span class="letter-signature-placeholder">Signature</span>';
   const title = senderTitle ? `<span>${escapeHtml(senderTitle)}</span>` : '';
   return `
     <section class="letter-signature notice-closing">
