@@ -4,6 +4,8 @@ import axios from 'axios';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
 import { notify } from '../utils/notify';
 import { useSSE } from '../hooks/useSSE';
+import { authHeaders } from '../utils/api';
+import { formatRelativeTime } from '../utils/dateFormat';
 
 function Icon({ name }) {
   const icons = {
@@ -34,21 +36,6 @@ function formatBadgeCount(count) {
   const n = Number(count) || 0;
   if (n > 99) return '99+';
   return String(n);
-}
-
-function formatRelativeTime(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const diffMs = Date.now() - date.getTime();
-  const mins = Math.floor(diffMs / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function roleLabel(role) {
@@ -98,7 +85,7 @@ export default function NavUserMenus({ token }) {
   const loadNavData = useCallback(async (showLoading = false) => {
     if (!token) return;
     if (showLoading) setNotificationsLoading(true);
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = authHeaders(token);
     try {
       const [notificationsRes, profileRes] = await Promise.allSettled([
         axios.get('/api/messages/notifications', { headers }),
@@ -208,13 +195,13 @@ export default function NavUserMenus({ token }) {
         if (profileForm.password) body.append('password', profileForm.password);
         body.append('profile_image', profileForm.profile_image);
         res = await axios.put('/api/auth/me', body, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: authHeaders(token)
         });
       } else {
         const payload = { name: profileForm.name, email: profileForm.email };
         if (profileForm.password) payload.password = profileForm.password;
         res = await axios.put('/api/auth/me', payload, {
-          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
+          headers: { ...authHeaders(token), 'Content-Type': 'application/json' }
         });
       }
       setProfile(res.data);
@@ -233,7 +220,7 @@ export default function NavUserMenus({ token }) {
   const markNotificationRead = async (messageId, { silent = false } = {}) => {
     try {
       await axios.patch(`/api/messages/${messageId}/read`, {}, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       setNotifications((items) => items.filter((item) => item.id !== messageId));
       setNotificationCount((count) => Math.max(0, count - 1));
@@ -252,7 +239,7 @@ export default function NavUserMenus({ token }) {
       await Promise.allSettled(
         notifications.map((msg) =>
           axios.patch(`/api/messages/${msg.id}/read`, {}, {
-            headers: { Authorization: `Bearer ${token}` }
+            headers: authHeaders(token)
           })
         )
       );

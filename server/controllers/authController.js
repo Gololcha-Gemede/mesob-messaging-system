@@ -4,7 +4,7 @@ const userModel = require('../models/user');
 const { validatePassword } = require('../utils/passwordPolicy');
 const { audit } = require('../utils/audit');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
-require('dotenv').config();
+const { getEnv } = require('../config/env');
 
 function uploadedFilePath(file) {
   return file?.filename ? `/uploads/${file.filename}` : undefined;
@@ -22,7 +22,7 @@ exports.login = async (req, res) => {
     audit('login_failed', req, { user_id: user.id, reason: 'bad_password' });
     return res.status(400).json({ message: 'Incorrect password' });
   }
-  const token = jwt.sign({ id: user.id, role: user.role, department_id: user.department_id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+  const token = jwt.sign({ id: user.id, role: user.role, department_id: user.department_id }, getEnv('JWT_SECRET'), { expiresIn: '1d' });
   audit('login_success', req, { user_id: user.id });
   res.json({
     token,
@@ -40,7 +40,7 @@ exports.login = async (req, res) => {
 
 exports.register = async (req, res) => {
   try {
-    if (process.env.ALLOW_PUBLIC_REGISTER !== 'true') {
+    if (getEnv('ALLOW_PUBLIC_REGISTER', 'false') !== 'true') {
       return res.status(403).json({
         message: 'Public registration is disabled. Contact an administrator to create an account.'
       });

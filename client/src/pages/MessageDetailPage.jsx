@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import RecipientPicker from '../components/RecipientPicker';
 import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
+import { authHeaders as buildAuthHeaders } from '../utils/api';
 
 function formatEventType(type) {
   return String(type || '')
@@ -23,9 +24,8 @@ export default function MessageDetailPage() {
   const [isSubmittingDraft, setIsSubmittingDraft] = useState(false);
   const [isForwarding, setIsForwarding] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const token = sessionStorage.getItem('token');
-  const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
+  const authHeaders = useMemo(() => buildAuthHeaders(token), [token]);
   const visibleHistory = useMemo(() => {
     const forwardedChildren = new Set(
       history
@@ -146,30 +146,6 @@ export default function MessageDetailPage() {
       setError(err?.response?.data?.message || 'Could not download attachment.');
     } finally {
       setIsDownloading(false);
-    }
-  };
-
-  const handlePdfDownload = async () => {
-    try {
-      setIsDownloadingPdf(true);
-      setError('');
-      const res = await axios.get(`/api/messages/${message.id}/pdf`, {
-        headers: authHeaders,
-        responseType: 'blob'
-      });
-      const url = URL.createObjectURL(res.data);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${message.reference_number || `message-${message.id}`}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      await loadMessage();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Could not download PDF.');
-    } finally {
-      setIsDownloadingPdf(false);
     }
   };
 

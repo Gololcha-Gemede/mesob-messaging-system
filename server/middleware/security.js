@@ -1,10 +1,12 @@
+const { getEnv } = require('../config/env');
+
 const DEFAULT_ALLOWED_ORIGINS = [
   'http://localhost:5173',
   'http://127.0.0.1:5173'
 ];
 
 function allowedOrigins() {
-  const configured = String(process.env.CORS_ORIGIN || '')
+  const configured = String(getEnv('CORS_ORIGIN'))
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
@@ -27,6 +29,14 @@ function corsOptions() {
   };
 }
 
+function cspConnectSources() {
+  return String(getEnv('CSP_CONNECT_SRC', "http://localhost:5000 http://127.0.0.1:5000"))
+    .split(/\s+/)
+    .map((source) => source.trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
 function securityHeaders(req, res, next) {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -40,7 +50,7 @@ function securityHeaders(req, res, next) {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
       "font-src 'self' data:",
-      "connect-src 'self' http://localhost:5000 http://127.0.0.1:5000",
+      `connect-src 'self' ${cspConnectSources()}`,
       "object-src 'none'",
       "base-uri 'self'",
       "frame-ancestors 'none'"

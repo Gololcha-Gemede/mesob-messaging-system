@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
-
-const SSE_BASE_URL = 'http://localhost:5000';
+import { API_BASE_URL } from '../config/api';
 
 export function useSSE(token, handlers = {}) {
   const eventSourceRef = useRef(null);
@@ -20,7 +19,7 @@ export function useSSE(token, handlers = {}) {
         eventSourceRef.current = null;
       }
 
-      const url = `${SSE_BASE_URL}/api/events?token=${encodeURIComponent(token)}`;
+      const url = `${API_BASE_URL}/api/events?token=${encodeURIComponent(token)}`;
       console.log('[SSE] Connecting to', url);
       const es = new EventSource(url);
       eventSourceRef.current = es;

@@ -14,6 +14,7 @@ import TrackMessagePage from './pages/TrackMessagePage';
 import NavUserMenus from './components/NavUserMenus';
 
 import { roleFromToken, ADMIN_REGISTER_SESSION_KEY, LOGIN_ENTRANCE_KEY } from './utils/jwt';
+import { authHeaders } from './utils/api';
 
 	function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('token');
@@ -152,7 +153,7 @@ function SideBar() {
 			return undefined;
 		}
 		let ignore = false;
-		const headers = { Authorization: `Bearer ${token}` };
+		const headers = authHeaders(token);
 		const loadUnread = async () => {
 			const dashboardResult = await axios.get('/api/search/dashboard', { headers }).catch(() => null);
 			if (ignore) return;

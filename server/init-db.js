@@ -1,5 +1,5 @@
 const mysql = require('mysql2/promise');
-require('dotenv').config();
+require('./config/env');
 
 async function initDatabase() {
   try {

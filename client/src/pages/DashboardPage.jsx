@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useLoginEntrance } from '../hooks/useLoginEntrance';
+import { authHeaders } from '../utils/api';
+import { formatDateTimeOrEmpty } from '../utils/dateFormat';
 
 function formatEvent(type) {
   return String(type || 'activity')
@@ -9,19 +11,8 @@ function formatEvent(type) {
 }
 
 
-function formatDate(value) {
-  if (!value) return '';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
-}
-
-
 function numberValue(value) {
   return Number(value) || 0;
-}
-
-function compactNumber(value) {
-  return new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(numberValue(value));
 }
 
 function sumCounts(items = []) {
@@ -62,19 +53,6 @@ function buildLastSixMonths(rows = []) {
     date.setMonth(date.getMonth() - (5 - index));
     const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
     return { month: key, label: monthLabel(key), count: byMonth.get(key) || 0 };
-  });
-}
-
-function buildCurrentMonthDays(rows = []) {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const byDay = new Map(rows.map((item) => [normalizeDayKey(item.day), numberValue(item.count)]));
-  return Array.from({ length: daysInMonth }).map((_, i) => {
-    const day = i + 1;
-    const key = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return { day: key, label: String(day), count: byDay.get(key) || 0 };
   });
 }
 
@@ -158,7 +136,7 @@ function LineChart({ items, max, label }) {
   );
 }
 
-function StatisticsToggle({ weeklyStats, monthlyStats, dailyThisMonth, maxWeekly, maxMonthly, maxDaily, enterDelay }) {
+function StatisticsToggle({ weeklyStats, monthlyStats, maxWeekly, maxMonthly, enterDelay }) {
   const [statsView, setStatsView] = useState('weekly');
   const options = [
     { id: 'weekly', label: 'Weekly' },
@@ -246,10 +224,8 @@ export default function DashboardPage() {
 
   const weeklyStats = useMemo(() => buildLastSevenDays(counts.weekly_stats), [counts.weekly_stats]);
   const monthlyStats = useMemo(() => buildLastSixMonths(counts.monthly_stats), [counts.monthly_stats]);
-  const dailyThisMonth = useMemo(() => buildCurrentMonthDays(counts.daily_this_month), [counts.daily_this_month]);
   const maxWeekly = Math.max(1, ...weeklyStats.map((item) => item.count));
   const maxMonthly = Math.max(1, ...monthlyStats.map((item) => item.count));
-  const maxDaily = Math.max(1, ...dailyThisMonth.map((item) => item.count));
   const displayName = profileName || 'User';
 
 
@@ -262,7 +238,7 @@ export default function DashboardPage() {
   ];
 
   useEffect(() => {
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = authHeaders(token);
     axios.get('/api/search/dashboard', { headers })
       .then((res) => {
         setCounts(res.data);
@@ -317,10 +293,8 @@ export default function DashboardPage() {
         <StatisticsToggle
           weeklyStats={weeklyStats}
           monthlyStats={monthlyStats}
-          dailyThisMonth={dailyThisMonth}
           maxWeekly={maxWeekly}
           maxMonthly={maxMonthly}
-          maxDaily={maxDaily}
           enterDelay={loginEnter ? '0.38s' : undefined}
         />
 
@@ -357,7 +331,7 @@ export default function DashboardPage() {
                       <>{item.subject || '(No subject)'} {item.reference_number ? `- ${item.reference_number}` : ''}</>
                     )}
                   </p>
-                  <small>You {formatDate(item.created_at)}</small>
+                  <small>You {formatDateTimeOrEmpty(item.created_at)}</small>
                 </div>
               </li>
             ))}

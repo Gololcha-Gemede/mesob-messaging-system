@@ -1,17 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { useSSE } from '../hooks/useSSE';
-
-function formatDate(dateString) {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const today = new Date();
-  if (date.toDateString() === today.toDateString()) {
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-}
+import PaginationRow from '../components/PaginationRow';
+import { authHeaders } from '../utils/api';
+import { formatMessageListDate } from '../utils/dateFormat';
 
 export default function InboxPage() {
   const [messages, setMessages] = useState([]);
@@ -31,7 +24,7 @@ export default function InboxPage() {
     setError('');
     axios
       .get(`/api/messages/inbox${qs ? `?${qs}` : ''}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       })
       .then((res) => {
         setMessages(Array.isArray(res.data) ? res.data : []);
@@ -137,7 +130,7 @@ export default function InboxPage() {
                       {msg.is_formal_letter ? <span className="letter-indicator">Formal Letter</span> : null}
                       {msg.file_path ? <span className="attachment-indicator">Attachment</span> : null}
                       {msg.due_date ? <span className="priority-label">Priority</span> : null}
-                      <span className="message-date">{formatDate(msg.created_at)}</span>
+                      <span className="message-date">{formatMessageListDate(msg.created_at)}</span>
                     </div>
                   </div>
                 </Link>
@@ -145,11 +138,7 @@ export default function InboxPage() {
             ))}
           </ul>
           {totalPages > 1 ? (
-            <div className="pagination-row">
-              <button type="button" className="secondary-btn" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))}>Previous</button>
-              <span>Page {currentPage} of {totalPages}</span>
-              <button type="button" className="secondary-btn" disabled={currentPage >= totalPages} onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>Next</button>
-            </div>
+            <PaginationRow currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
           ) : null}
         </div>
       )}

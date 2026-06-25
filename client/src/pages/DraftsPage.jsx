@@ -2,12 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { notify } from '../utils/notify';
-
-function formatDate(value) {
-  if (!value) return 'Not available';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? 'Not available' : date.toLocaleString();
-}
+import PaginationRow from '../components/PaginationRow';
+import { authHeaders } from '../utils/api';
+import { formatDateTimeOrFallback } from '../utils/dateFormat';
 
 export default function DraftsPage() {
   const [messages, setMessages] = useState([]);
@@ -28,7 +25,7 @@ export default function DraftsPage() {
       setError('');
       axios
         .get(`/api/messages/drafts${qs ? `?${qs}` : ''}`, {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` }
+          headers: authHeaders()
         })
         .then((res) => {
           if (ignore) return;
@@ -73,7 +70,7 @@ export default function DraftsPage() {
     setError('');
     try {
       await axios.delete('/api/messages/drafts', {
-          headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` },
+        headers: authHeaders(),
         data: { ids }
       });
       setMessages((items) => items.filter((msg) => !ids.includes(msg.id)));
@@ -140,7 +137,7 @@ export default function DraftsPage() {
                 <div className="message-item-meta">
                   <span className={`status-pill status-${msg.status}`}>{msg.status}</span>
                   {msg.file_path ? <span className="attachment-indicator">📎</span> : null}
-                  <span className="message-date">Edited {formatDate(msg.created_at || msg.submitted_at)}</span>
+                  <span className="message-date">Edited {formatDateTimeOrFallback(msg.created_at || msg.submitted_at)}</span>
                 </div>
               </div>
             </Link>
@@ -156,11 +153,7 @@ export default function DraftsPage() {
         ))}
       </ul>
       {!loading && totalPages > 1 ? (
-        <div className="pagination-row">
-          <button type="button" className="secondary-btn" disabled={currentPage <= 1} onClick={() => setPage(Math.max(1, currentPage - 1))}>Previous</button>
-          <span>Page {currentPage} of {totalPages}</span>
-          <button type="button" className="secondary-btn" disabled={currentPage >= totalPages} onClick={() => setPage(Math.min(totalPages, currentPage + 1))}>Next</button>
-        </div>
+        <PaginationRow currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
       ) : null}
       {!loading && !messages.length ? (
         <div className="empty-state">No drafts found.</div>

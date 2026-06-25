@@ -1,13 +1,13 @@
-# Mesob Connect — Internal Message Management System
+# Mesob Connect - Internal Message Management System
 
-Full-stack app for internal organizational correspondence (formal letters, inbox, tracking) and direct messages between users.
+Full-stack app for internal organizational correspondence, formal letters, message tracking, and direct messages between users.
 
 ## Stack
 
 - **Client:** React 19 + Vite (`client/`)
 - **Server:** Express 5 + MySQL (`server/`)
 
-## Quick start
+## Quick Start
 
 1. Copy environment variables:
    ```bash
@@ -15,7 +15,7 @@ Full-stack app for internal organizational correspondence (formal letters, inbox
    ```
    Edit `.env` with your MySQL credentials and a strong `JWT_SECRET`.
 
-2. Create the database (once):
+2. Create the database once:
    ```bash
    mysql -u root -p < server/setup-database.sql
    ```
@@ -27,31 +27,58 @@ Full-stack app for internal organizational correspondence (formal letters, inbox
    cd ../server && npm install
    ```
 
-4. Run (two terminals):
+4. Run the app in two terminals:
    ```bash
    npm run server
    npm run client
    ```
-   - API: http://localhost:5000  
-   - App: http://localhost:5173 (proxies `/api` and `/uploads` to the server)
+   - API: `http://localhost:5000`
+   - App: `http://localhost:5173`
 
-5. Sign in with sample users from `setup-database.sql` (change passwords before production).
+## Main Features
 
-## Main features
-
-- Compose formal letters (templates, PDF, attachments)
-- Inbox / sent / drafts with filters, flag, and archive
+- Compose formal letters with templates, PDFs, and attachments
+- Inbox, sent, and drafts with filters
 - Message tracking and event history
-- Direct Message template — informal 1-to-1 mail via Compose (same inbox/sent flow as other templates)
-- Admin: users and departments
+- Direct-message style 1-to-1 mail through Compose
+- Admin user and department management
 
 ## Configuration
 
+The client and server read configuration from the repo-root `.env`. The server also supports an optional `server/.env` for backend-only deployments.
+
 | Variable | Purpose |
 |----------|---------|
-| `DB_*` | MySQL connection |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | MySQL connection |
 | `JWT_SECRET` | Token signing |
-| `ALLOW_PUBLIC_REGISTER` | `true` to allow `POST /api/auth/register`; default off |
+| `PORT` | API server port |
+| `CORS_ORIGIN` | Comma-separated browser origins allowed to call the API |
+| `CSP_CONNECT_SRC` | Space-separated API/SSE origins allowed by Content Security Policy |
+| `UPLOAD_DIR` | Upload directory relative to `server/` |
+| `VITE_DEV_HOST`, `VITE_DEV_PORT` | Vite development server host and port |
+| `VITE_PROXY_TARGET` | API target used by the Vite dev proxy |
+| `VITE_API_BASE_URL` | Optional browser API base URL; blank uses same-origin `/api` and `/uploads` |
+| `ALLOW_PUBLIC_REGISTER` | `true` to allow public registration; default off |
+
+## Project Structure
+
+```text
+client/
+  src/
+    components/
+    config/
+    hooks/
+    pages/
+    utils/
+server/
+  config/
+  controllers/
+  middleware/
+  models/
+  routes/
+  services/
+  utils/
+```
 
 ## Scripts
 
@@ -59,24 +86,9 @@ Full-stack app for internal organizational correspondence (formal letters, inbox
 |---------|-------------|
 | `npm run server` | Start API with nodemon |
 | `npm run client` | Start Vite dev server |
-| `npm run build` | Build client for production |
+| `npm run build` | Build the client for production |
 
 ## Notes
 
-- User accounts are normally created by an **admin** via Admin → Register user.
-- Uploaded files are stored under `server/uploads/` (not committed to git).
-
-  Comments
-admin(manages users and departments)/manager(should access all messages)/staff  ---> users
-subject, to amharic, remove table,....., remove memo and circular, track messages by date, each forwarded message should tell the original sender
-
-Modifications
-- Add a signature field to registration that will be displayed at the bottom of the letters
-- Change the format of the formal letter to look like real letter and change some terms to amharic
-- Remove the dropdown options in the subject field
-- Remove sender name field as it will take the current user as the sender
-- Remove unnecessary texts from the compose page and draft page like 'Auto-saved 58 minutes ago' and others
-- remove forward note field when forwarding a message
-- status?
-
--> Download not working, Remove request form template?, move signature straightly below keselamta gar
+- User accounts are normally created by an admin from the Admin panel.
+- Uploaded files are stored under `server/uploads/` by default and are not committed to git.

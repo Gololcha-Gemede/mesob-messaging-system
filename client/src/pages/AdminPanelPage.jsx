@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
+import PaginationRow from '../components/PaginationRow';
+import { authHeaders } from '../utils/api';
 
 export default function AdminPanelPage() {
   const navigate = useNavigate();
@@ -30,12 +32,12 @@ export default function AdminPanelPage() {
   });
   const [listError, setListError] = useState('');
 
-  const authHeaders = () => ({ headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
+  const authConfig = () => ({ headers: authHeaders() });
 
 
   const loadData = useCallback(async () => {
     setListError('');
-    const h = authHeaders();
+    const h = authConfig();
     const [usersRes, deptRes] = await Promise.allSettled([
       axios.get('/api/users', h),
       axios.get('/api/departments', h),
@@ -65,7 +67,7 @@ export default function AdminPanelPage() {
   const handleDeptSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await axios.post('/api/departments', { name: deptName, code: deptCode }, authHeaders());
+      const res = await axios.post('/api/departments', { name: deptName, code: deptCode }, authConfig());
       setDeptName('');
       setDeptCode('');
       setSelectedDepartmentId(res.data?.id ?? null);
@@ -88,7 +90,7 @@ export default function AdminPanelPage() {
 
   const saveDept = async (id) => {
     try {
-      await axios.put(`/api/departments/${id}`, { name: editingDeptName, code: editingDeptCode }, authHeaders());
+      await axios.put(`/api/departments/${id}`, { name: editingDeptName, code: editingDeptCode }, authConfig());
       cancelEditDept();
       await loadData();
     } catch {
@@ -98,7 +100,7 @@ export default function AdminPanelPage() {
 
   const deleteDept = async (id) => {
     try {
-      await axios.delete(`/api/departments/${id}`, authHeaders());
+      await axios.delete(`/api/departments/${id}`, authConfig());
       if (selectedDepartmentId === id) setSelectedDepartmentId(null);
       setConfirmAction(null);
       await loadData();
@@ -133,7 +135,7 @@ export default function AdminPanelPage() {
         department_id: editForm.department_id,
       };
       if (editForm.password.trim()) body.password = editForm.password.trim();
-      await axios.put(`/api/users/${editingUser}`, body, authHeaders());
+      await axios.put(`/api/users/${editingUser}`, body, authConfig());
       cancelEditUser();
       await loadData();
     } catch (err) {
@@ -143,7 +145,7 @@ export default function AdminPanelPage() {
 
   const deleteUser = async (id) => {
     try {
-      await axios.delete(`/api/users/${id}`, authHeaders());
+      await axios.delete(`/api/users/${id}`, authConfig());
       if (editingUser === id) cancelEditUser();
       setConfirmAction(null);
       await loadData();
@@ -316,11 +318,7 @@ export default function AdminPanelPage() {
               </tbody>
             </table>
           </div>
-          <div className="pagination-row">
-            <button type="button" className="secondary-btn" disabled={page <= 1} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button>
-            <span>Page {page} of {totalPages}</span>
-            <button type="button" className="secondary-btn" disabled={page >= totalPages} onClick={() => setPage((value) => Math.min(totalPages, value + 1))}>Next</button>
-          </div>
+          <PaginationRow currentPage={page} totalPages={totalPages} onPageChange={setPage} />
         </div>
       ) : null}
 

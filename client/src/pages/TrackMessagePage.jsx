@@ -2,17 +2,8 @@ import { useState } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { roleFromToken } from '../utils/jwt';
-
-function formatDate(value) {
-  if (!value) return '';
-  try {
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return '';
-    return d.toLocaleString();
-  } catch {
-    return '';
-  }
-}
+import { authHeaders } from '../utils/api';
+import { formatDateTimeOrEmpty } from '../utils/dateFormat';
 
 function displayUser(name, id) {
   return name || (id ? `User #${id}` : 'Unassigned');
@@ -55,7 +46,7 @@ export default function TrackMessagePage() {
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
       const res = await axios.get(`/api/messages/track?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: authHeaders(token)
       });
       setMessages(Array.isArray(res.data) ? res.data : []);
       setSearched(true);
@@ -117,8 +108,8 @@ export default function TrackMessagePage() {
           <ul className="message-list">
             {messages.map((msg) => {
               const isForwarded = Boolean(msg.parent_message_id);
-              const sentAt = formatDate(msg.submitted_at || msg.created_at);
-              const forwardedAt = formatDate(msg.forwarded_at || msg.submitted_at || msg.created_at);
+              const sentAt = formatDateTimeOrEmpty(msg.submitted_at || msg.created_at);
+              const forwardedAt = formatDateTimeOrEmpty(msg.forwarded_at || msg.submitted_at || msg.created_at);
               const forwardedBy = displayUser(msg.forwarded_by_name || msg.sender_name, msg.forwarded_by_id || msg.sender_id);
               const receiver = displayUser(msg.receiver_name, msg.receiver_id);
               return (
@@ -141,7 +132,7 @@ export default function TrackMessagePage() {
                         <span>Original step {msg.parent_reference_number}</span>
                       ) : null}
                       {msg.forward_note ? <span>Note: {msg.forward_note}</span> : null}
-                      {msg.read_at ? <span>Read {formatDate(msg.read_at)}</span> : <span>Unread</span>}
+                      {msg.read_at ? <span>Read {formatDateTimeOrEmpty(msg.read_at)}</span> : <span>Unread</span>}
                     </div>
                   </Link>
                 </li>

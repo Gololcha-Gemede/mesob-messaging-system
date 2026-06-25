@@ -2,6 +2,7 @@ const express = require('express');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const sseService = require('../services/sseService');
+const { getEnv } = require('../config/env');
 
 router.get('/events', (req, res) => {
   const authHeader = req.headers['authorization'];
@@ -15,7 +16,7 @@ router.get('/events', (req, res) => {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+  jwt.verify(token, getEnv('JWT_SECRET'), (err, user) => {
     if (err) {
       return res.status(403).json({ message: 'Invalid token' });
     }

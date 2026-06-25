@@ -1,17 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const dotenv = require('dotenv');
 const authRoutes = require('./routes/auth');
 const { initSchema } = require('./models/schemaInit');
 const { corsOptions, securityHeaders } = require('./middleware/security');
+const { getEnv } = require('./config/env');
+const { uploadDir } = require('./config/paths');
 
-dotenv.config();
 const app = express();
 
 app.use(cors(corsOptions()));
 app.use(securityHeaders);
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
+app.use('/uploads', express.static(uploadDir));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -33,7 +33,7 @@ app.use('/api/search', searchRoutes);
 const sseRoutes = require('./routes/sse');
 app.use('/api', sseRoutes);
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(getEnv('PORT', '5000'));
 
 async function startServer() {
   try {
