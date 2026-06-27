@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api, authHeaders } from '../utils/api';
 import { formatDateTimeOrEmpty } from '../utils/dateFormat';
+import { useLoginEntrance } from '../hooks/useLoginEntrance';
+import { Link } from 'react-router-dom';
 
 function formatEvent(type) {
   return String(type || 'activity')
