@@ -1,8 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
-import { Link } from 'react-router-dom';
-import { useLoginEntrance } from '../hooks/useLoginEntrance';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatDateTimeOrEmpty } from '../utils/dateFormat';
 
 function formatEvent(type) {
@@ -239,7 +236,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const headers = authHeaders(token);
-    axios.get('/api/search/dashboard', { headers })
+    api.get('/api/search/dashboard', { headers })
       .then((res) => {
         setCounts(res.data);
         setError('');
@@ -248,7 +245,7 @@ export default function DashboardPage() {
         setError('Unable to load dashboard counts.');
       });
 
-    axios.get('/api/auth/me', { headers })
+    api.get('/api/auth/me', { headers })
       .then((res) => {
         const nextName = String(res.data?.name || res.data?.email || '').trim();
         setProfileName(nextName);

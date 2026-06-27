@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { roleFromToken } from '../utils/jwt';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatDateTimeOrEmpty } from '../utils/dateFormat';
 
 function displayUser(name, id) {
@@ -45,7 +44,7 @@ export default function TrackMessagePage() {
       if (cleanSubject) params.set('subject', cleanSubject);
       if (dateFrom) params.set('date_from', dateFrom);
       if (dateTo) params.set('date_to', dateTo);
-      const res = await axios.get(`/api/messages/track?${params.toString()}`, {
+      const res = await api.get(`/api/messages/track?${params.toString()}`, {
         headers: authHeaders(token)
       });
       setMessages(Array.isArray(res.data) ? res.data : []);

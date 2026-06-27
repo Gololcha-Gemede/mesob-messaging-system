@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Link, NavLink, useLocation } from 'react-router-dom';
-import axios from 'axios';
+
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
@@ -14,7 +14,7 @@ import TrackMessagePage from './pages/TrackMessagePage';
 import NavUserMenus from './components/NavUserMenus';
 
 import { roleFromToken, ADMIN_REGISTER_SESSION_KEY, LOGIN_ENTRANCE_KEY } from './utils/jwt';
-import { authHeaders } from './utils/api';
+import { api, authHeaders } from './utils/api';
 
 	function PrivateRoute({ children }) {
   const token = sessionStorage.getItem('token');
@@ -155,7 +155,7 @@ function SideBar() {
 		let ignore = false;
 		const headers = authHeaders(token);
 		const loadUnread = async () => {
-			const dashboardResult = await axios.get('/api/search/dashboard', { headers }).catch(() => null);
+			const dashboardResult = await api.get('/api/search/dashboard', { headers }).catch(() => null);
 			if (ignore) return;
 			if (dashboardResult) {
 				setUnreadInboxCount(Number(dashboardResult.data?.unread) || 0);

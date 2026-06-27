@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+
 import { Link } from 'react-router-dom';
 import { notify } from '../utils/notify';
 import PaginationRow from '../components/PaginationRow';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatDateTimeOrFallback } from '../utils/dateFormat';
 
 export default function DraftsPage() {
@@ -23,7 +23,7 @@ export default function DraftsPage() {
       const qs = params.toString();
       setLoading(true);
       setError('');
-      axios
+      api
         .get(`/api/messages/drafts${qs ? `?${qs}` : ''}`, {
           headers: authHeaders()
         })
@@ -69,7 +69,7 @@ export default function DraftsPage() {
     setDeleting(true);
     setError('');
     try {
-      await axios.delete('/api/messages/drafts', {
+      await api.delete('/api/messages/drafts', {
         headers: authHeaders(),
         data: { ids }
       });

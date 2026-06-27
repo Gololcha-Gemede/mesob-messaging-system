@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import axios from 'axios';
+import { api } from '../utils/api';
 import RecipientPicker from '../components/RecipientPicker';
 import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
@@ -122,7 +122,7 @@ export default function ComposeMessagePage() {
   useEffect(() => {
     const headers = { Authorization: `Bearer ${token}` };
 
-    axios
+    api
       .get('/api/users/recipients', { headers })
       .then((res) => {
         setUsers(Array.isArray(res.data) ? res.data : []);
@@ -144,7 +144,7 @@ export default function ComposeMessagePage() {
     }
     let ignore = false;
 
-    axios
+    api
       .get('/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
       .then((res) => {
         if (ignore) return;
@@ -277,7 +277,7 @@ export default function ComposeMessagePage() {
 
     setPreviewing(true);
     try {
-      const res = await axios.post(
+      const res = await api.post(
         '/api/messages/preview',
         {
           receiver_ids: receivers,
@@ -341,7 +341,7 @@ export default function ComposeMessagePage() {
     if (files.length > 0) formData.append('file', files[0]);
 
     try {
-      await axios.post('/api/messages', formData, {
+      await api.post('/api/messages', formData, {
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem('token')}`,
           'Content-Type': 'multipart/form-data',

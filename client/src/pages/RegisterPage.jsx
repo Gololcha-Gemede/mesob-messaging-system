@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../utils/api';
 import AuthPageLayout, { AuthInputRow } from '../components/AuthPageLayout';
 import SignaturePad from 'signature_pad';
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
@@ -28,7 +28,7 @@ export default function RegisterPage() {
   }, [location.state]);
 
   useEffect(() => {
-      axios.get('/api/departments', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } })
+      api.get('/api/departments', { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } })
       .then(res => {
         if (Array.isArray(res.data)) {
           setDepartments(res.data);
@@ -104,7 +104,7 @@ export default function RegisterPage() {
       body.append('department_id', departmentId);
       if (profileImage) body.append('profile_image', profileImage);
       if (signatureImage) body.append('signature_image', signatureImage);
-      await axios.post('/api/users', body, { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
+      await api.post('/api/users', body, { headers: { Authorization: `Bearer ${sessionStorage.getItem('token')}` } });
       sessionStorage.removeItem(ADMIN_REGISTER_SESSION_KEY);
       setSuccess('User registered successfully!');
       setName(''); setEmail(''); setPassword(''); setRole('user'); setDepartmentId(''); setProfileImage(null);

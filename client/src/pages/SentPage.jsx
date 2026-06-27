@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { Link } from 'react-router-dom';
 import PaginationRow from '../components/PaginationRow';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatMessageListDate } from '../utils/dateFormat';
 
 export default function SentPage() {
@@ -21,7 +20,7 @@ export default function SentPage() {
       const qs = params.toString();
       setLoading(true);
       setError('');
-      axios
+      api
         .get(`/api/messages/sent${qs ? `?${qs}` : ''}`, {
           headers: authHeaders()
         })

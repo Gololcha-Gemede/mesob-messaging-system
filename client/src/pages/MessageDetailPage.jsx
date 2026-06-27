@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
 import { useParams } from 'react-router-dom';
 import RecipientPicker from '../components/RecipientPicker';
 import LetterRenderer from '../components/LetterRenderer';
 import { notify } from '../utils/notify';
-import { authHeaders as buildAuthHeaders } from '../utils/api';
+import { api, authHeaders as buildAuthHeaders } from '../utils/api';
 
 function formatEventType(type) {
   return String(type || '')
@@ -51,28 +50,28 @@ export default function MessageDetailPage() {
 
 
   const loadMessage = useCallback(async () => {
-    const res = await axios.get(`/api/messages/${id}`, { headers: authHeaders });
+    const res = await api.get(`/api/messages/${id}`, { headers: authHeaders });
     setMessage(res.data);
   }, [authHeaders, id]);
 
   const loadHistory = useCallback(async () => {
-    const res = await axios.get(`/api/messages/${id}/history`, { headers: authHeaders });
+    const res = await api.get(`/api/messages/${id}/history`, { headers: authHeaders });
     setHistory(Array.isArray(res.data) ? res.data : []);
   }, [authHeaders, id]);
 
   useEffect(() => {
     let ignore = false;
     Promise.all([
-      axios.get(`/api/messages/${id}`, { headers: authHeaders }),
-      axios.get(`/api/messages/${id}/history`, { headers: authHeaders }),
-      axios.get('/api/users/recipients', { headers: authHeaders })
+      api.get(`/api/messages/${id}`, { headers: authHeaders }),
+      api.get(`/api/messages/${id}/history`, { headers: authHeaders }),
+      api.get('/api/users/recipients', { headers: authHeaders })
     ]).then(([messageRes, historyRes, recipientsRes]) => {
       if (ignore) return;
       setMessage(messageRes.data);
       setHistory(Array.isArray(historyRes.data) ? historyRes.data : []);
       setRecipients(Array.isArray(recipientsRes.data) ? recipientsRes.data : []);
       setError('');
-      axios.patch(`/api/messages/${id}/read`, {}, { headers: authHeaders }).catch(() => {});
+      api.patch(`/api/messages/${id}/read`, {}, { headers: authHeaders }).catch(() => {});
     }).catch((err) => {
       if (ignore) return;
       const apiMessage = err?.response?.data?.message;
@@ -88,7 +87,7 @@ export default function MessageDetailPage() {
   const handleSubmitDraft = async () => {
     try {
       setIsSubmittingDraft(true);
-      await axios.post(`/api/messages/${id}/submit`, {}, { headers: authHeaders });
+      await api.post(`/api/messages/${id}/submit`, {}, { headers: authHeaders });
       setFeedback('Draft submitted.');
       setError('');
       await Promise.all([loadMessage(), loadHistory()]);
@@ -107,7 +106,7 @@ export default function MessageDetailPage() {
         return;
       }
       setIsForwarding(true);
-      await axios.post(
+      await api.post(
         `/api/messages/${id}/forward`,
         { new_receiver_ids: forwardTo, new_receiver_id: forwardTo[0] || '' },
         { headers: authHeaders }
@@ -130,7 +129,7 @@ export default function MessageDetailPage() {
     try {
       setIsDownloading(true);
       setError('');
-      const res = await axios.get(`/api/messages/${message.id}/attachment`, {
+      const res = await api.get(`/api/messages/${message.id}/attachment`, {
         headers: authHeaders,
         responseType: 'blob'
       });
@@ -151,7 +150,7 @@ export default function MessageDetailPage() {
 
   const handlePrintLetter = async () => {
     try {
-      await axios.post(`/api/messages/${message.id}/print`, {}, { headers: authHeaders });
+      await api.post(`/api/messages/${message.id}/print`, {}, { headers: authHeaders });
       await loadHistory();
     } catch {
       // Printing should still be available if tracking fails transiently.

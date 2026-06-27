@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import axios from 'axios';
+
 import { ADMIN_REGISTER_SESSION_KEY } from '../utils/jwt';
 import { notify } from '../utils/notify';
 import { useSSE } from '../hooks/useSSE';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatRelativeTime } from '../utils/dateFormat';
 
 function Icon({ name }) {
@@ -88,8 +88,8 @@ export default function NavUserMenus({ token }) {
     const headers = authHeaders(token);
     try {
       const [notificationsRes, profileRes] = await Promise.allSettled([
-        axios.get('/api/messages/notifications', { headers }),
-        axios.get('/api/auth/me', { headers })
+        api.get('/api/messages/notifications', { headers }),
+        api.get('/api/auth/me', { headers })
       ]);
 
       if (notificationsRes.status === 'fulfilled') {
@@ -194,13 +194,13 @@ export default function NavUserMenus({ token }) {
         body.append('email', profileForm.email);
         if (profileForm.password) body.append('password', profileForm.password);
         body.append('profile_image', profileForm.profile_image);
-        res = await axios.put('/api/auth/me', body, {
+        res = await api.put('/api/auth/me', body, {
           headers: authHeaders(token)
         });
       } else {
         const payload = { name: profileForm.name, email: profileForm.email };
         if (profileForm.password) payload.password = profileForm.password;
-        res = await axios.put('/api/auth/me', payload, {
+        res = await api.put('/api/auth/me', payload, {
           headers: { ...authHeaders(token), 'Content-Type': 'application/json' }
         });
       }
@@ -219,7 +219,7 @@ export default function NavUserMenus({ token }) {
 
   const markNotificationRead = async (messageId, { silent = false } = {}) => {
     try {
-      await axios.patch(`/api/messages/${messageId}/read`, {}, {
+      await api.patch(`/api/messages/${messageId}/read`, {}, {
         headers: authHeaders(token)
       });
       setNotifications((items) => items.filter((item) => item.id !== messageId));
@@ -238,7 +238,7 @@ export default function NavUserMenus({ token }) {
     try {
       await Promise.allSettled(
         notifications.map((msg) =>
-          axios.patch(`/api/messages/${msg.id}/read`, {}, {
+          api.patch(`/api/messages/${msg.id}/read`, {}, {
             headers: authHeaders(token)
           })
         )

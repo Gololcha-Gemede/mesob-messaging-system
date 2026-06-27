@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+
 import { Link } from 'react-router-dom';
 import { useSSE } from '../hooks/useSSE';
 import PaginationRow from '../components/PaginationRow';
-import { authHeaders } from '../utils/api';
+import { api, authHeaders } from '../utils/api';
 import { formatMessageListDate } from '../utils/dateFormat';
 
 export default function InboxPage() {
@@ -22,7 +22,7 @@ export default function InboxPage() {
     if (statusFilter) params.set('status', statusFilter);
     const qs = params.toString();
     setError('');
-    axios
+    api
       .get(`/api/messages/inbox${qs ? `?${qs}` : ''}`, {
         headers: authHeaders(token)
       })

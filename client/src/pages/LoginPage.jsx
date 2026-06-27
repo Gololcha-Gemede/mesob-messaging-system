@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { api } from '../utils/api';
 import AuthPageLayout, { AuthInputRow } from '../components/AuthPageLayout';
 import { LOGIN_ENTRANCE_KEY } from '../utils/jwt';
 
@@ -66,7 +66,7 @@ export default function LoginPage() {
     setSubmitting(true);
 
     try {
-      const res = await axios.post('/api/auth/login', { email: cleanEmail, password });
+      const res = await api.post('/api/auth/login', { email: cleanEmail, password });
       if (rememberMe) {
         localStorage.setItem(REMEMBERED_EMAIL_KEY, cleanEmail);
       } else {
