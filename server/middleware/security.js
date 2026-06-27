@@ -48,7 +48,7 @@ function securityHeaders(req, res, next) {
       "default-src 'self'",
       "script-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:",
+      "img-src 'self' data: blob: https://res.cloudinary.com;",
       "font-src 'self' data:",
       `connect-src 'self' ${cspConnectSources()}`,
       "object-src 'none'",
