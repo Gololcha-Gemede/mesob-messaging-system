@@ -1,12 +1,9 @@
 const bcrypt = require('bcryptjs');
 const userModel = require('../models/user');
 const { audit } = require('../utils/audit');
+const { uploadFileToCloudinary } = require('../utils/cloudinaryUpload');
 const { validatePassword } = require('../utils/passwordPolicy');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
-
-function uploadedFilePath(file) {
-  return file?.filename ? `/uploads/${file.filename}` : null;
-}
 
 function normalizeRole(role) {
   if (role === 'admin') return 'admin';
@@ -28,6 +25,17 @@ exports.createUser = async (req, res) => {
     if (profileUploadError) return res.status(400).json({ message: profileUploadError });
     const signatureUploadError = await validateUploadedFile(signatureImage, { allowPdf: false, allowImages: true });
     if (signatureUploadError) return res.status(400).json({ message: signatureUploadError });
+
+    let profileImageUrl = null;
+    let signatureImageUrl = null;
+
+    if (profileImage) {
+      profileImageUrl = await uploadFileToCloudinary(profileImage.path, 'profile-images');
+    }
+    if (signatureImage) {
+      signatureImageUrl = await uploadFileToCloudinary(signatureImage.path, 'signatures');
+    }
+
     const existing = await userModel.findByEmail(email);
     if (existing) return res.status(400).json({ message: 'Email already in use' });
     const normalizedRole = normalizeRole(role);
@@ -38,8 +46,8 @@ exports.createUser = async (req, res) => {
       password: hashedPassword,
       role: normalizedRole,
       department_id,
-      profile_image_path: uploadedFilePath(profileImage),
-      signature_image_path: uploadedFilePath(signatureImage)
+      profile_image_path: profileImageUrl,
+      signature_image_path: signatureImageUrl
     });
     audit('admin_created_user', req, { user_id: userId, role: normalizedRole });
     res.status(201).json({ id: userId });

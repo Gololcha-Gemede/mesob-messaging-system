@@ -7,6 +7,7 @@ const { withLockedReference } = require('../services/referenceService');
 const { generateLetterPdf } = require('../services/pdfService');
 const { audit } = require('../utils/audit');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
+const { uploadFileToCloudinary } = require('../utils/cloudinaryUpload');
 const sseService = require('../services/sseService');
 
 async function getUserDepartmentId(userId) {
@@ -55,10 +56,16 @@ function canAccessMessage(user, message) {
   return Number(message.sender_id) === Number(user.id) || Number(message.receiver_id) === Number(user.id);
 }
 
-function fileMetadata(file) {
+async function fileMetadata(file) {
   if (!file) return {};
+  let file_path;
+  try {
+    file_path = await uploadFileToCloudinary(file.path, 'attachments');
+  } catch {
+    file_path = file.path;
+  }
   return {
-    file_path: file.path,
+    file_path,
     file_name: file.originalname || file.filename || null,
     file_mime: file.mimetype || null,
     file_size: file.size || null
@@ -169,7 +176,7 @@ exports.sendMessage = async (req, res) => {
     const uploadError = await validateUploadedFile(req.file, { allowPdf: true, allowImages: true });
     if (uploadError) return res.status(400).json({ message: uploadError });
     const sender = await userModel.findById(sender_id);
-    const attachmentFields = fileMetadata(req.file);
+    const attachmentFields = await fileMetadata(req.file);
     // Note: actual file metadata is stored on the message (file_path/file_name/etc.)
     // but attachments are not rendered inside the letter HTML.
     const attachments = uploadAttachmentMetadata(req.file);
@@ -533,6 +540,9 @@ exports.downloadAttachment = async (req, res) => {
       actor_id: req.user.id
     });
     audit('attachment_downloaded', req, { message_id: Number(id) });
+    if (String(message.file_path).startsWith('http')) {
+      return res.redirect(message.file_path);
+    }
     res.download(message.file_path);
   } catch (err) {
     res.status(500).json({ message: 'Error downloading attachment', error: err.message });
@@ -573,7 +583,11 @@ exports.downloadPdf = async (req, res) => {
       actor_id: req.user.id
     });
     audit('pdf_downloaded', req, { message_id: Number(id) });
-    res.download(pdfPath, `${message.reference_number || `message-${id}`}.pdf`);
+    if (String(pdfPath).startsWith('http')) {
+      res.redirect(pdfPath);
+    } else {
+      res.download(pdfPath, `${message.reference_number || `message-${id}`}.pdf`);
+    }
   } catch (err) {
     res.status(500).json({ message: 'Error downloading PDF', error: err.message });
   }

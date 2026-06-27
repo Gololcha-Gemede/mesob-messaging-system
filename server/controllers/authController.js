@@ -4,6 +4,7 @@ const userModel = require('../models/user');
 const { validatePassword } = require('../utils/passwordPolicy');
 const { audit } = require('../utils/audit');
 const { validateUploadedFile } = require('../utils/uploadSecurity');
+const { uploadFileToCloudinary } = require('../utils/cloudinaryUpload');
 const { getEnv } = require('../config/env');
 
 function uploadedFilePath(file) {
@@ -66,14 +67,24 @@ exports.register = async (req, res) => {
     const signatureUploadError = await validateUploadedFile(signatureImage, { allowPdf: false, allowImages: true });
     if (signatureUploadError) return res.status(400).json({ message: signatureUploadError });
 
+    let profileImageUrl = null;
+    let signatureImageUrl = null;
+
+    if (profileImage) {
+      profileImageUrl = await uploadFileToCloudinary(profileImage.path, 'profile-images');
+    }
+    if (signatureImage) {
+      signatureImageUrl = await uploadFileToCloudinary(signatureImage.path, 'signatures');
+    }
+
     const userId = await userModel.create({
       name,
       email,
       password: hashedPassword,
       role: 'user',
       department_id: null,
-      profile_image_path: uploadedFilePath(profileImage) || null,
-      signature_image_path: uploadedFilePath(signatureImage) || null
+      profile_image_path: profileImageUrl,
+      signature_image_path: signatureImageUrl
     });
     audit('user_registered', req, { user_id: userId, email });
 
@@ -124,31 +135,46 @@ exports.updateMe = async (req, res) => {
     if (passwordError) return res.status(400).json({ message: passwordError });
     const uploadError = await validateUploadedFile(req.file, { allowPdf: false, allowImages: true });
     if (uploadError) return res.status(400).json({ message: uploadError });
+    let profileImageUrl = null;
 
-    const payload = {
-      name,
-      email,
-      role: user.role,
-      department_id: user.department_id
-    };
-    if (password) payload.password = await bcrypt.hash(password, 10);
-    if (position_title !== undefined) payload.position_title = position_title;
-    const profileImagePath = uploadedFilePath(req.file);
-    if (profileImagePath !== undefined) payload.profile_image_path = profileImagePath;
-    await userModel.update(req.user.id, payload);
-    audit('profile_updated', req, { user_id: req.user.id });
+    if (req.file) {
+      profileImageUrl = await uploadFileToCloudinary(req.file.path, 'profile-images');
+    }
+const payload = {
+  name,
+  email,
+  role: user.role,
+  department_id: user.department_id
+};
 
-    res.json({
-      id: user.id,
-      name,
-      email,
-      role: user.role,
-      department_id: user.department_id,
-      profile_image_path: payload.profile_image_path ?? user.profile_image_path,
-      position_title: payload.position_title ?? user.position_title,
-      signature_image_path: payload.signature_image_path ?? user.signature_image_path
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Error updating profile', error: err.message });
-  }
+if (password) {
+  payload.password = await bcrypt.hash(password, 10);
+}
+
+if (position_title !== undefined) {
+  payload.position_title = position_title;
+}
+
+if (profileImageUrl) {
+  payload.profile_image_path = profileImageUrl;
+}
+
+await userModel.update(req.user.id, payload);
+audit('profile_updated', req, { user_id: req.user.id });
+
+res.json({
+  id: user.id,
+  name,
+  email,
+  role: user.role,
+  department_id: user.department_id,
+  profile_image_path: payload.profile_image_path ?? user.profile_image_path,
+  position_title: payload.position_title ?? user.position_title,
+  signature_image_path: payload.signature_image_path ?? user.signature_image_path
+}); } catch (err) {
+  res.status(500).json({
+    message: 'Error updating profile',
+    error: err.message
+  });
+}
 };

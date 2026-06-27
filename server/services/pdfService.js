@@ -2,6 +2,7 @@ const fs = require('fs/promises');
 const path = require('path');
 const zlib = require('zlib');
 const { buildLetterData, formatDate } = require('./letterFormatter');
+const { uploadFileToCloudinary } = require('../utils/cloudinaryUpload');
 
 const PDF_DIR = path.join(__dirname, '..', 'generated-pdfs');
 const ASSETS_DIR = path.join(__dirname, '..');
@@ -339,8 +340,15 @@ async function generateLetterPdf(input) {
   const filePath = path.join(PDF_DIR, fileName);
   const headerImage = await loadHeaderImage();
   const pages = paginate(letterLines(input));
-  await fs.writeFile(filePath, buildPdf(pages, headerImage));
-  return filePath;
+  const pdfBuffer = buildPdf(pages, headerImage);
+  await fs.writeFile(filePath, pdfBuffer);
+
+  try {
+    const cloudUrl = await uploadFileToCloudinary(filePath, 'generated-pdfs');
+    return cloudUrl;
+  } catch {
+    return filePath;
+  }
 }
 
 module.exports = {
