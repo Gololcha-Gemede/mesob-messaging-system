@@ -6,10 +6,13 @@ html {
 
 body {
   margin: 0;
+  min-width: 320px;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100svh;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
