@@ -344,7 +344,6 @@ export default function ComposeMessagePage() {
       await api.post('/api/messages', formData, {
         headers: {
           Authorization: `Bearer ${sessionStorage.getItem('token')}`,
-          'Content-Type': 'multipart/form-data',
         },
       });
       setSuccess(action === 'draft' ? 'Draft saved.' : 'Official letter sent.');
@@ -491,7 +490,7 @@ export default function ComposeMessagePage() {
               multiple
               onChange={(e) => addFiles(e.target.files)}
               className="file-input"
-              accept="*/*"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,image/jpeg,image/png,image/gif,image/webp,application/pdf"
             />
           </label>
 

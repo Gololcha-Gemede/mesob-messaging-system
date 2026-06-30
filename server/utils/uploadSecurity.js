@@ -48,8 +48,11 @@ async function validateUploadedFile(file, { allowPdf = true, allowImages = true 
   }
 
   if (file.mimetype && file.mimetype !== detected) {
-    removeUploadedFile(file);
-    return 'Uploaded file type does not match its contents.';
+    const normalized = file.mimetype === 'image/jpg' ? 'image/jpeg' : file.mimetype;
+    if (normalized !== detected) {
+      removeUploadedFile(file);
+      return 'Uploaded file type does not match its contents.';
+    }
   }
 
   return '';

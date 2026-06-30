@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const multer = require('multer');
 const authRoutes = require('./routes/auth');
 const { initSchema } = require('./models/schemaInit');
 const { corsOptions, securityHeaders } = require('./middleware/security');
@@ -32,6 +33,20 @@ app.use('/api/search', searchRoutes);
 
 const sseRoutes = require('./routes/sse');
 app.use('/api', sseRoutes);
+
+// Multer error handler — returns JSON instead of non-JSON text/html
+app.use((err, req, res, next) => {
+  if (err instanceof multer.MulterError) {
+    const message = err.code === 'LIMIT_FILE_SIZE'
+      ? 'File is too large. Maximum size is 10 MB.'
+      : `Upload error: ${err.message}`;
+    return res.status(400).json({ message });
+  }
+  if (err.message && err.message.includes('Only images')) {
+    return res.status(400).json({ message: err.message });
+  }
+  next(err);
+});
 
 const PORT = Number(getEnv('PORT', '5000'));
 
