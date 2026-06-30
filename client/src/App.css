@@ -2764,6 +2764,7 @@ button.secondary-btn:hover {
     display: flex;
     flex-wrap: wrap;
     min-height: auto;
+    height: auto;
     border-left: 0;
     border-right: 0;
   }
@@ -3149,11 +3150,13 @@ button:hover {
   .app-shell {
     grid-template-columns: 1fr;
     padding: 0 1rem;
+    min-height: 0;
   }
 
   .side-nav {
     position: static;
     min-height: auto;
+    height: auto;
     margin-top: 1rem;
   }
 }
@@ -6156,6 +6159,7 @@ a:focus-visible,
     gap: 0.3rem;
     padding: 0.4rem;
     min-height: auto;
+    height: auto;
     position: static;
     border-radius: 10px;
   }
@@ -6893,9 +6897,7 @@ a:focus-visible,
 /* ---------- 768px: tablets / large phones ---------- */
 @media (max-width: 768px) {
   /* --- Global overflow prevention --- */
-  .app-main { overflow-x: hidden; }
-  .app-shell { overflow-x: hidden; }
-  .app-content { min-width: 0; overflow-x: hidden; }
+  .app-content { min-width: 0; min-height: 0; }
   .top-nav { overflow-x: hidden; }
   .top-nav-inner { flex-wrap: wrap; overflow: hidden; }
   .brand-block { min-width: 0; flex-shrink: 1; overflow: hidden; }
