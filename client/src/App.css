@@ -1126,7 +1126,7 @@ body {
   position: absolute;
   top: calc(100% + 0.6rem);
   right: 0;
-  z-index: 50;
+  z-index: 1000;
   width: min(340px, calc(100vw - 2rem));
   padding: 0;
   border: 1px solid var(--border-soft);
@@ -6866,8 +6866,8 @@ a:focus-visible,
 @media (max-width: 768px) {
   /* --- Global overflow prevention --- */
   .app-content { min-width: 0; min-height: 0; }
-  .top-nav { overflow-x: hidden; }
-  .top-nav-inner { flex-wrap: wrap; overflow: hidden; }
+  .top-nav { overflow: visible; }
+  .top-nav-inner { flex-wrap: wrap; overflow: visible; }
   .brand-block { min-width: 0; flex-shrink: 1; overflow: hidden; }
   .brand-text { min-width: 0; overflow: hidden; }
   .brand-title {
