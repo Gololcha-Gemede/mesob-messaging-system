@@ -2759,16 +2759,6 @@ button.secondary-btn:hover {
     padding: 0 1rem;
   }
 
-  .side-nav {
-    position: static;
-    display: flex;
-    flex-wrap: wrap;
-    min-height: auto;
-    height: auto;
-    border-left: 0;
-    border-right: 0;
-  }
-
   .button-row {
     grid-template-columns: 1fr;
   }
@@ -3164,15 +3154,6 @@ button:hover {
 @media (max-width: 640px) {
   .app-shell {
     padding: 0;
-  }
-
-  .side-nav {
-    border-radius: 0;
-    margin-top: 0;
-  }
-
-  .side-nav-submenu {
-    padding-left: 0;
   }
 
   .dashboard-container,
@@ -5567,6 +5548,28 @@ button:hover {
   box-shadow: none;
 }
 
+.mobile-menu-btn {
+  display: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--qms-blue);
+  cursor: pointer;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.mobile-menu-btn .nav-icon {
+  width: 20px;
+  height: 20px;
+}
+.mobile-sidebar-backdrop {
+  display: none;
+}
+
 .side-nav-collapse:hover,
 .side-nav-collapse:focus-visible {
   background: rgba(255, 255, 255, 0.24);
@@ -6153,75 +6156,37 @@ a:focus-visible,
     height: 34px;
   }
 
+  .mobile-menu-btn {
+    display: flex;
+  }
+
+  .mobile-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    background: rgba(0, 0, 0, 0.4);
+  }
+
   .side-nav {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.3rem;
-    padding: 0.4rem;
-    min-height: auto;
-    height: auto;
-    position: static;
-    border-radius: 10px;
-  }
-
-  .side-nav-site {
     display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 950;
+    width: 272px;
+    max-width: 80vw;
+    min-height: 100vh;
+    height: auto;
+    border-radius: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .side-nav-link {
-    font-size: 0.78rem;
-    min-height: 34px;
-    justify-content: center;
-    text-align: center;
-    padding: 0.25rem 0.5rem;
-    border-radius: 8px;
-  }
-
-  .side-nav-link svg.nav-icon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .side-nav-group {
+  .side-nav--mobile-open {
     display: flex;
-    flex-wrap: wrap;
-    gap: 0.25rem;
-    align-items: center;
-  }
-
-  .side-nav-group-trigger {
-    font-size: 0.78rem;
-    min-height: 34px;
-    padding: 0.25rem 0.5rem;
-    border-radius: 8px;
-  }
-
-  .side-nav-group-trigger > .nav-icon {
-    width: 16px;
-    height: 16px;
-  }
-
-  .side-nav-group-trigger > span {
-    gap: 0.35rem;
-  }
-
-  .side-nav-submenu {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.2rem;
-    max-height: none;
-    opacity: 1;
-    padding-left: 0;
-    overflow: visible;
-    position: static;
-    width: 100%;
-  }
-
-  .side-nav-sublink {
-    min-height: 30px;
-    font-size: 0.75rem;
-    padding: 0.2rem 0.5rem;
-    border-radius: 6px;
+    flex-direction: column;
   }
 
   .dashboard-hero {
@@ -7470,18 +7435,6 @@ a:focus-visible,
   .top-nav-inner {
     align-items: center;
     padding-inline: 0.75rem;
-  }
-
-  .side-nav {
-    overflow-x: auto;
-    scrollbar-width: thin;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  .side-nav-link,
-  .side-nav-group-trigger,
-  .side-nav-sublink {
-    white-space: nowrap;
   }
 
   input,

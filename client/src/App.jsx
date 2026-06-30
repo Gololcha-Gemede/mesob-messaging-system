@@ -59,7 +59,9 @@ function Icon({ name }) {
 		users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm13 10v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8',
 		departments: 'M3 21h18M5 21V7l8-4v18M19 21V11l-6-4M9 9h1M9 13h1M9 17h1',
 		chevron: 'm6 9 6 6 6-6',
-		check: 'M20 6 9 17l-5-5'
+		check: 'M20 6 9 17l-5-5',
+		menu: 'M3 6h18M3 12h18M3 18h18',
+		close: 'M18 6 6 18M6 6l12 12'
 	};
 	return (
 		<svg className="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -101,7 +103,7 @@ function ToastHost() {
 	);
 }
 
-function NavBar() {
+function NavBar({ onToggleSidebar }) {
 	const token = sessionStorage.getItem('token');
 	const homePath = token ? '/' : '/login';
 
@@ -109,6 +111,11 @@ function NavBar() {
 		<header>
 			<nav className="top-nav" aria-label="Main">
 				<div className="top-nav-inner">
+					{token ? (
+						<button type="button" className="mobile-menu-btn" onClick={onToggleSidebar} aria-label="Toggle menu">
+							<Icon name="menu" />
+						</button>
+					) : null}
 					<Link to={homePath} className="brand-block">
 						<img
 							className="brand-logo"
@@ -137,7 +144,7 @@ function NavBar() {
 	);
 }
 
-function SideBar() {
+function SideBar({ mobileOpen, onClose }) {
 	const token = sessionStorage.getItem('token');
 	const isAdmin = roleFromToken(token) === 'admin';
 	const location = useLocation();
@@ -181,7 +188,7 @@ function SideBar() {
 	const adminActive = location.pathname === '/admin';
 
 	return (
-		<aside className="side-nav" aria-label="Tools">
+		<aside className={`side-nav${mobileOpen ? ' side-nav--mobile-open' : ''}`} aria-label="Tools">
 			<div className="side-nav-site">
 				<img className="side-nav-site-logo" src={APP_LOGO} alt="" width={40} height={40} />
 				<div className="side-nav-site-text">
@@ -237,6 +244,7 @@ function AppLayout() {
 	const location = useLocation();
 	const authRoute = location.pathname === '/login' || location.pathname === '/register';
 	const [pageEnter, setPageEnter] = useState(false);
+	const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
 	useEffect(() => {
 		if (authRoute) return undefined;
@@ -250,9 +258,13 @@ function AppLayout() {
 		};
 	}, [authRoute, location.pathname]);
 
+	useEffect(() => {
+		setMobileSidebarOpen(false);
+	}, [location.pathname]);
+
 	return (
 		<>
-			{!authRoute ? <NavBar /> : null}
+			{!authRoute ? <NavBar onToggleSidebar={() => setMobileSidebarOpen((v) => !v)} /> : null}
 			<div className={authRoute ? 'app-main app-main--auth' : 'app-main'}>
 				{authRoute ? (
 					<Routes>
@@ -261,7 +273,8 @@ function AppLayout() {
 					</Routes>
 				) : (
 					<div className="app-shell">
-						<SideBar />
+						{mobileSidebarOpen ? <div className="mobile-sidebar-backdrop" onClick={() => setMobileSidebarOpen(false)} /> : null}
+						<SideBar mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
 						<div className={`app-content${pageEnter ? ' app-content--enter' : ''}`}>
 							<Routes>
 								<Route path="/" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
